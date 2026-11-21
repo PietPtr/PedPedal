@@ -68,7 +68,8 @@ pdftoppm -png -r 220 -x X -y Y -W W -H H -singlefile sch.pdf crop   # zoom on a 
   checking.
 - `mech/assembly_steps.py`: the mechanical assembly steps (4 buttons) and the optional side-wall
   steps at the end of `docs/build.md`. It holds the step texts, which `build_docs.py` reads, and renders their pictures
-  into `docs/build/mech/` (`uv run --group dev mech/assembly_steps.py`, about 1 min).
+  into `docs/build/mech/`, plus `cover.webp`, the exploded view at the top of build.md and in the
+  README (`--cover` renders only that one) (`uv run --group dev mech/assembly_steps.py`, about 1 min).
 
 - `pcb/`: the KiCad project (`footswitch.kicad_pro`, `.kicad_sch`, later `.kicad_pcb`).
 - `pcb/footswitches.pretty/`: project footprints (the PBS24-202P footswitch), registered in

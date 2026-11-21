@@ -1,6 +1,7 @@
 """Mechanical assembly steps for a 4-button unit: the step texts, and their pictures.
 
-    uv run --group dev mech/assembly_steps.py    # writes docs/build/mech/*.webp
+    uv run --group dev mech/assembly_steps.py            # writes docs/build/mech/*.webp
+    uv run --group dev mech/assembly_steps.py --cover    # only the cover picture
 
 The texts are plain data (STEPS, and WALL_STEPS for the optional printed walls) and are read by
 pcb/scripts/build_docs.py, which puts them at the end of docs/build.md. This script only makes the pictures: it builds the unit
@@ -218,15 +219,16 @@ USB goes in through the cutout in the right-hand end cap.
 # pulled apart. Layers go up and down; the walls move outwards, so nothing hides the boards.
 # Seen from the right, where the Pico's USB port is.
 COVER_NAME = 'cover.webp'
-COVER_VIEW = (60, 24)
+COVER_VIEW = (60, 26)
 COVER_EXPLODE = {
-    'switch_nut_top_': 120, 'switch_washer_top_': 108, 'screw_top_': 120, 'front_plate': 85,
-    'foot_': -70, 'screw_bottom_': -45,
-    'wall_end_left': (-60, 0, 25), 'wall_end_right': (60, 0, 25),
-    'wall_front_': (0, -60, 25), 'wall_pin_front_': (0, -60, 25),
-    'wall_back_': (0, 60, 25), 'wall_pin_back_': (0, 60, 25),
+    'switch_nut_top_': 165, 'switch_washer_top_': 150, 'screw_top_': 165, 'front_plate': 120,
+    'foot_': -75, 'screw_bottom_': -45,
+    # Walls: the right cap aside and back, out of the way of the USB port; the front wall down.
+    'wall_end_left': (-70, 30, 30), 'wall_end_right': (65, 105, -5),
+    'wall_front_': (0, -55, -35), 'wall_pin_front_': (0, -55, -35),
+    'wall_back_': (0, 75, 30), 'wall_pin_back_': (0, 75, 30),
     'back_plate': 0,
-    **{q: 30 for q in BOARDS + COLUMNS + ['switch_nut_low_', 'switch_washer_low_', 'socket_', 'ribbon_']},
+    **{q: 40 for q in BOARDS + COLUMNS + ['switch_nut_low_', 'switch_washer_low_', 'socket_', 'ribbon_']},
 }
 
 
@@ -327,6 +329,9 @@ def main():
         print(f'  {name}')
     visible = []
     steps = [('', i, s) for i, s in enumerate(STEPS, 1)] + [('w', i, s) for i, s in enumerate(WALL_STEPS, 1)]
+    cover_only = '--cover' in sys.argv
+    if cover_only:
+        steps = []
     for prefix, i, s in steps:
         new = s['adds'] + s.get('removes', [])
         visible += s['adds']
@@ -347,7 +352,7 @@ def main():
     camera([''], COVER_EXPLODE, COVER_VIEW)         # '' matches every part
     save(grab(), COVER_NAME)
     for f in OUT.glob('*.webp'):
-        if f.name not in written:
+        if f.name not in written and not cover_only:
             f.unlink()
 
 
