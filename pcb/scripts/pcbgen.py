@@ -35,28 +35,34 @@ P['SW1'] = (40, 64, 180)
 P['D1'] = (40 - 2.413, 30 - 0.762, 0)
 P['U1'] = (18.1, 31, 0)
 P['U2'] = (80 - 18.1 - 7.62, 31, 0)
-P['J2'] = (5.2, 37, 0)                    # OUT, left edge
-P['J1'] = (80 - 5.2 - 2.54, 37, 0)        # IN, right edge
 P['C3'] = (14.2, 32, -90); P['C1'] = (14.2, 41, -90)
 P['C2'] = (65.8, 32, -90); P['C4'] = (47, 29.5, 0)
 for i in range(3):                       # LED drivers, centred under the LED
     P[f'Q{1+i}'] = (32 + 8 * i - 2.54, 37.5, 0)
     P[f'R{16+i}'] = (40 - 5.08, 44 + 3 * i, 0)
-for i, r in enumerate(['R4', 'R15', 'R14', 'R13', 'R12', 'R11', 'R10', 'R9']):
-    P[r] = (4.5 + 3.3 * i, 54.5, -90)
-for i, r in enumerate(['R5', 'R6', 'R7', 'R8', 'R3', 'R2', 'R1']):
-    P[r] = (75.5 - 3.3 * i, 54.5, -90)
+for i, r in enumerate(['R4', 'R9']):
+    P[r] = (24.3 + 3.3 * i, 54.5, -90)
+for i, r in enumerate(['R3', 'R2', 'R1']):
+    P[r] = (62.3 - 3.3 * i, 54.5, -90)
 P['U3'] = (80 - 3.17, 3.2, -90)            # Pico, USB to the right edge
-P['J3'] = (4.22, 10.54, 90)        # odd row (IN1-IN6) faces the board
+# Chain connectors side by side in the top-left corner, left of the Pico (pin-1 positions, not
+# shifted by DY). OUT is left of IN, so OUT of one module and IN of the next module (100 mm to
+# the left) are 100 - 12 = 88 mm apart, centre to centre: a 10 cm cable lies nearly flat.
+P['J2'] = (4.9, 6.2, 0)                   # OUT
+P['J1'] = (16.9, 6.2, 0)                  # IN
+for i, r in enumerate(['R5', 'R6', 'R7', 'R8']):   # Pico series resistors, pad 1 (Pico side) right
+    P[r] = (21.0, 24 + 3 * i, 180)
 REFPOS = {'C2': (65.8, 29.3), 'C3': (14.2, 29.3), 'C1': (14.2, 48.4)}
 for i in range(3):
     REFPOS[f'Q{1+i}'] = (32 + 8 * i, 41.0)
     REFPOS[f'R{16+i}'] = (32.0, 44 + 3 * i)
-HOLES = [(4, 27.5 + DY), (76, 27.5 + DY), (4, 72 + DY), (76, 72 + DY)]
+HOLES = [(4, 27.2), (76, 27.2), (4, 72 + DY), (76, 72 + DY)]   # top pair just under the Pico
 for _r in list(P):
-    if _r not in ('U3', 'J3'):
+    if _r not in ('U3', 'J1', 'J2', 'R5', 'R6', 'R7', 'R8'):
         _x, _y, _a = P[_r]; P[_r] = (_x, _y + DY, _a)
 REFPOS = {k: (v[0], v[1] + DY) for k, v in REFPOS.items()}
+for i in range(4):
+    REFPOS[f'R{5+i}'] = (23.9, 24 + 3 * i)
 
 def rot(x, y, a):
     t = math.radians(a); c, s = round(math.cos(t), 9), round(math.sin(t), 9)
@@ -86,7 +92,7 @@ def place(ref, fpid, x, y, a, value, path=None, board_only=False, keywords=None)
         if e[0] == 'property':
             if e[1] == 'Reference':
                 e[2] = ref
-                if ref.startswith('H'):
+                if ref.startswith('H') or ref in ('J1', 'J2'):   # J1/J2: named in the IN/OUT silk text
                     e.insert(4, [S('hide'), S('yes')])
                 if ref.startswith('R') and a == -90:
                     at = find1(e, 'at'); at[1], at[2] = 12.9, 0
@@ -160,7 +166,7 @@ def gtext(s, x, y, size=1.0, layer='F.SilkS', a=0, just=None):
 graphics.append([S('gr_rect'), [S('start'), BX, BY], [S('end'), BX + W, BY + H],
                  [S('stroke'), [S('width'), 0.1], [S('type'), S('solid')]], [S('fill'), S('no')],
                  [S('layer'), 'Edge.Cuts'], [S('uuid'), u()]])
-gtext('OUT', 6.47, 51.8 + DY, 1.2); gtext('IN', 73.53, 51.8 + DY, 1.2)
+gtext('J2 OUT', 6.17, 21.0, 1.2); gtext('J1 IN', 18.17, 21.0, 1.2)
 gtext('to next module', 5.47, 30.0, 0.8, a=0) if False else None
 gtext('Footswitch module v0.1', 40, 74.6 + DY, 1.0)
 gtext('Pico: module 1 only', 52, 12.1, 1.0, layer='F.Fab')

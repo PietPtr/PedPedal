@@ -24,7 +24,7 @@ def find_chrome():
 
 
 def fetch(query, choice_only):
-    slug = re.sub(r"\s+", "-", query.strip())
+    slug = re.sub(r"[\s/]+", "-", query.strip())  # "/" would end up in the URL path (404)
     url = f"https://www.aliexpress.com/w/wholesale-{urllib.parse.quote(slug)}.html"
     if choice_only:
         url += "?selectedSwitches=filterCode%3Achoice_atm"

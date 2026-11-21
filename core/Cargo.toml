@@ -1,0 +1,8 @@
+[package]
+name = "footswitch-core"
+version = "0.1.0"
+edition = "2024"
+license = "MIT OR Apache-2.0"
+description = "Shared between the footswitch firmware and driver: config types, the SysEx protocol, USB-MIDI packets and the pedal state machine. no_std."
+
+[dependencies]

@@ -1,0 +1,21 @@
+[package]
+name = "footswitch"
+version = "0.1.0"
+edition = "2024"
+license = "MIT OR Apache-2.0"
+description = "Host driver for the USB MIDI footswitch: configure each pedal's MIDI message, momentary/latch mode and LED colour."
+
+[dependencies]
+footswitch-core = { path = "../core" }
+midir = "0.11"
+thiserror = "2"
+clap = { version = "4", features = ["derive"], optional = true }
+
+[features]
+default = ["cli"]
+# The `fsctl` command-line tool. Library users can turn this off to skip clap.
+cli = ["dep:clap"]
+
+[[bin]]
+name = "fsctl"
+required-features = ["cli"]

@@ -1,0 +1,20 @@
+[project]
+name = "footswitches-tools"
+version = "0.1.0"
+description = "Helper scripts for the footswitch project: PCB generation, docs, front plate DXF"
+requires-python = ">=3.11"
+dependencies = [
+    "ezdxf",
+    "markdown>=3.11.3",
+    "matplotlib",
+    "numpy",
+    "pillow",
+]
+
+[tool.uv]
+package = false
+
+[dependency-groups]
+dev = [
+    "cadquery>=2.8.0",
+]

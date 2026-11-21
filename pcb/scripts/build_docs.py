@@ -1,15 +1,19 @@
 #!/usr/bin/env python3
 """Generate the build instructions, docs/build.md, and their images in docs/build/.
 
-    python3 pcb/scripts/build_docs.py [--board pcb/footswitch.kicad_pcb] [--quality high|basic]
-                                      [--no-images]
+    uv run pcb/scripts/build_docs.py [--board pcb/footswitch.kicad_pcb] [--quality high|basic]
+                                   [--no-images] [--pdf]
+
+The last section, the mechanical assembly, takes its texts from mech/assembly_steps.py; its
+pictures are made by that script (uv run --group dev mech/assembly_steps.py).
 
 The step texts live in STEPS below. Everything else comes from the board:
 - Parts tables: values and refs are read from the footprints, and resistor colour codes are
   worked out from the values.
 - Images: for each step, the board is copied with the 3D models of parts not yet fitted
   hidden, then rendered with kicad-cli. The new parts are outlined: the step is also rendered
-  without them, and the pixels that changed are outlined.
+  without them, and the pixels that changed are outlined. That comparison uses basic-quality
+renders, which have no shadows.
 
 Edit this script, not docs/build.md: the next run overwrites it.
 
@@ -19,13 +23,15 @@ the text and CHECKS are brought up to date. Every footprint must belong to a ste
 NOT_IN_STEPS), so a new part can't be left out of the instructions without notice.
 
 Renders are cached in ~/.cache/footswitch-build-docs, keyed on the board variant and render
-settings, so a run where only the text changed re-renders nothing.
+settings, so a run where only the text changed re-renders nothing. The finished images
+(outlined, cropped, encoded) are cached there too, keyed on the renders they are made from and
+on the code that makes them, so an unchanged image is just copied.
 """
-import argparse, copy, hashlib, os, re, shutil, subprocess, sys, tempfile
+import argparse, copy, hashlib, inspect, os, re, shutil, subprocess, sys, tempfile
 from pathlib import Path
 
 import numpy as np
-from PIL import Image, ImageFilter
+from PIL import Image, ImageDraw, ImageFilter
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import sx
@@ -35,7 +41,7 @@ ROOT = Path(__file__).resolve().parents[2]
 CACHE = Path(os.environ.get('XDG_CACHE_HOME', Path.home() / '.cache')) / 'footswitch-build-docs'
 
 # Camera: tilted towards the viewer, as if looking at the board on the bench from the front.
-RENDER_ARGS = ['--width', '1600', '--height', '1300', '--rotate', '-35,0,0', '--perspective',
+RENDER_ARGS = ['--preset', 'follow_pcb_editor', '--width', '1600', '--height', '1300', '--rotate', '-35,0,0', '--perspective',
                '--background', 'transparent']
 OUT_WIDTH = 1000          # px, final image width
 NEW_COLOUR = (255, 40, 200)     # outline around the parts of this step
@@ -50,13 +56,14 @@ CHIP_Z = 3.0              # mm, lifts the chip onto the socket
 # chips:     sockets that get their chip in this step.
 # extra:     parts that are not footprints on the board, as (qty, description).
 # main_only: skipped on extension boards.
+# ext_refs:  footprints fitted in this step on extension boards only (left empty on the main board).
 STEPS = [
-    dict(slug='10k', title='10 kΩ resistors, left bank', refs=['R4', 'R9', 'R10', 'R11', 'R12',
-         'R13', 'R14', 'R15'], text="""
-1. Bend the leads and push the resistors into all 8 positions of the **left resistor bank**.
+    dict(slug='10k', title='10 kΩ resistors, left bank', refs=['R4', 'R9'], text="""
+1. Bend the leads and push the resistors into both positions of the **left resistor bank**,
+   left of the footswitch.
 2. Solder. Cut the leads.
 
-They are all the same value, and direction doesn't matter.
+They are the same value, and direction doesn't matter.
 """),
     dict(slug='led-resistors', title='LED resistors, right bank', refs=['R1', 'R2', 'R3'], text="""
 1. **R1** (leftmost position of the right bank): 560 Ω.
@@ -72,8 +79,11 @@ Check the colour bands before soldering: R1 is the odd one out.
 """),
     dict(slug='33r', title='Pico series resistors (main board only)', main_only=True,
          refs=['R5', 'R6', 'R7', 'R8'], text="""
-1. Fill the **4 rightmost** positions of the right bank (R8, R7, R6, R5).
+1. Fit **R5–R8**, the four resistors lying flat under the `J2 OUT` / `J1 IN` labels, next to
+   the Pico.
 2. Solder. Cut the leads.
+
+They are all the same value, and direction doesn't matter.
 """),
     dict(slug='ceramic', title='Ceramic capacitors', refs=['C1', 'C2', 'C3'], text="""
 1. Fit **C3** and **C1** (left of U1) and **C2** (right of U2).
@@ -102,11 +112,14 @@ from the flat side. The emitter goes in the square pad. Check the pinout of your
    left, next to the **+** mark. The stripe on the can marks the **−** side.
 2. Solder. Cut the leads.
 """),
-    dict(slug='headers', title='Headers', refs=['J1', 'J2', 'J3'], text="""
-1. **J2** (`OUT`, left) and **J1** (`IN`, right): both go the same way round, with the
-   **notch** in the shroud on the **left**, matching the outline.
-2. **J3** (top left): the 2×8 pin header.
-3. For each: solder one pin, check that it sits flat and straight, then solder the rest.
+    dict(slug='headers', title='Chain connector', refs=['J2'], ext_refs=['J1'], text="""
+1. Fit **J2** (`OUT`, top-left corner) with the **notch** in the shroud on the **left**,
+   matching the outline.
+2. Solder one pin, check that it sits flat and straight, then solder the rest.
+
+The main board gets **no J1** (`IN`, right of J2; outlined in orange): leave it empty. The
+Pico drives those lines, so nothing plugs in there. Extension boards get both headers, the
+same way round.
 """),
     dict(slug='pico', title='Pico (main board only)', main_only=True, refs=['U3'],
          extra=[(2, '1×20 pin header'), (2, '1×20 female socket (optional)')], text="""
@@ -118,16 +131,16 @@ from the flat side. The emitter goes in the square pad. Check the pinout of your
 4. Without sockets: also solder all 40 pins on the bottom of the board.
 """),
     dict(slug='power-check', title='Power check (main board only)', main_only=True, refs=[],
-         highlight=['J3'], text="""
+         highlight=['J2'], text="""
 1. Plug USB into the Pico. No chips are fitted yet.
-2. Measure on **J3** (pin 1 is the square pad):
-   - pin 14 to pin 16: about **5 V**
-   - pin 13 to pin 16: about **3.3 V**
+2. Measure on **J2** (`OUT`; pin 1 is the square pad, top left, and pin 2 is next to it):
+   - pin 1 to pin 2: about **5 V**
+   - pin 3 to pin 2: about **3.3 V**
 3. Unplug USB.
 
 If either is wrong, stop and look for solder bridges.
 """),
-    dict(slug='led', title='LED', refs=['D1'], extra=[(1, 'LED spacer, ~16 mm')], text="""
+    dict(slug='led', title='LED', refs=['D1'], extra=[(1, 'LED spacer, 19 mm')], text="""
 The LED must be **common anode**.
 
 1. Slide the spacer over the leads.
@@ -137,20 +150,18 @@ The LED must be **common anode**.
 3. Push the spacer down to the board, check that the LED stands straight, solder, and cut the
    leads.
 """),
-    dict(slug='footswitch', title='Footswitch and standoffs', refs=['SW1'],
-         highlight=['H1', 'H2', 'H3', 'H4'], extra=[(4, 'M3 standoff + screw, ~22–24 mm')], text="""
-1. Screw a standoff into each corner hole (**H1–H4**).
-2. Put the switch's 6 pins through **SW1**. Pin 1 of the switch goes in the **square pad**
+    dict(slug='footswitch', title='Footswitch', refs=['SW1'], text="""
+1. Put the switch's 6 pins through **SW1**. Pin 1 of the switch goes in the **square pad**
    (bottom right).
-3. Solder all 6 pins, even the unused ones: they hold the switch.
-4. **Test** with the meter on the bottom row of SW1 pads, from the middle pad to the left
+2. Solder all 6 pins, even the unused ones: they hold the switch. Cut the pins to 3 mm or
+   less: the back plate sits close under the board.
+3. **Test** with the meter on the bottom row of SW1 pads, from the middle pad to the left
    pad: open when released, closed when pressed. If it's the other way round, the switch is
    turned the wrong way.
 
-*Tip:* for a perfect fit, mount the switch and standoffs in the top panel first, lay the
-board on them, and solder the switch in place.
-
-The footswitch has no 3D model, so the picture shows only its pads.
+*Tip:* for a perfect fit, screw the 25 mm standoffs to the front plate and nut the switch in
+first, lay the board on them, screw the short standoffs up through it (mechanical step M2),
+and only then solder the switch.
 """),
     dict(slug='chips', title='Chips', refs=[], chips=['U1', 'U2'], text="""
 1. Bend the chip legs slightly inwards on a table so they fit the socket.
@@ -175,8 +186,8 @@ CHECKS = {
     'U3': -90,                          # USB to the right
 }
 # Facts the step texts rely on: refs that must sit left-to-right in this order, same row.
-ROW_CHECKS = [['R1', 'R2', 'R3', 'R8', 'R7', 'R6', 'R5'], ['U1', 'D1', 'C4', 'U2'],
-              ['J2', 'U1'], ['U2', 'J1']]
+ROW_CHECKS = [['R4', 'R9', 'SW1', 'R1', 'R2', 'R3'], ['U1', 'D1', 'C4', 'U2'],
+              ['J2', 'J1', 'U3']]
 
 # ------------------------------------------------------------------------------- the board
 class Board:
@@ -212,12 +223,21 @@ class Board:
                     find1(find1(chip, 'offset'), 'xyz')[3] = CHIP_Z
                     e.append(chip)
             out.append(e)
-        return sx.dump(out) + '\n'
+        # The render runs from a temp dir, so point project-relative models at the project.
+        return sx.dump(out).replace('${KIPRJMOD}', str(self.path.resolve().parent)) + '\n'
+
+    def project_models(self, text):
+        """Contents hash of the project's own 3D models used in `text`, for the cache key."""
+        h = hashlib.sha1()
+        d = str(self.path.resolve().parent)
+        for f in sorted(set(re.findall(r'\(model "(' + re.escape(d) + r'/[^"]+)"', text))):
+            if os.path.exists(f): h.update(Path(f).read_bytes())
+        return h.hexdigest()
 
 
 def check(board):
     errs = []
-    step_refs = [r for s in STEPS for r in s['refs']]
+    step_refs = [r for s in STEPS for r in s['refs'] + s.get('ext_refs', [])]
     for r in sorted(set(step_refs)):
         if step_refs.count(r) > 1: errs.append(f'{r} is fitted in more than one step')
     used = set(step_refs) | {r for s in STEPS for r in s.get('highlight', []) + s.get('chips', [])}
@@ -277,7 +297,6 @@ def describe(ref, value):
     if p == 'D': return '5 mm RGB LED, 4 leads, **common anode**'
     if p == 'SW': return f'{value} footswitch, momentary'
     if ref in ('J1', 'J2'): return '2×4 shrouded box header'
-    if ref == 'J3': return '2×8 pin header'
     if value.startswith('RaspberryPi_Pico'): return 'Raspberry Pi Pico'
     return value
 
@@ -321,11 +340,20 @@ class Renderer:
         self.board, self.quality = board, quality
         self.tmp = Path(tempfile.mkdtemp(prefix='build-docs-'))
         CACHE.mkdir(parents=True, exist_ok=True)
+        self.keys = {}
 
-    def render(self, fitted, present, chips=()):
-        text = self.board.variant(fitted, present, chips)
-        args = RENDER_ARGS + ['--quality', self.quality]
-        key = hashlib.sha1((text + repr(args)).encode()).hexdigest()
+    def key(self, fitted, present, chips=(), quality=None):
+        """Cache key of a render, and the board text it needs (memoised)."""
+        args = RENDER_ARGS + ['--quality', quality or self.quality]
+        k = (frozenset(fitted), frozenset(present), frozenset(chips), tuple(args))
+        if k not in self.keys:
+            text = self.board.variant(fitted, present, chips)
+            h = hashlib.sha1((text + repr(args) + self.board.project_models(text)).encode())
+            self.keys[k] = (h.hexdigest(), text, args)
+        return self.keys[k]
+
+    def render(self, fitted, present, chips=(), quality=None):
+        key, text, args = self.key(fitted, present, chips, quality)
         png = CACHE / f'{key}.png'
         if not png.exists():
             pcb = self.tmp / 'board.kicad_pcb'
@@ -343,8 +371,10 @@ def outline(img, before, after, colour):
     diff = np.abs(after - before).max(axis=2) > 40
     m = Image.fromarray((diff * 255).astype(np.uint8))
     m = m.filter(ImageFilter.MinFilter(3)).filter(ImageFilter.MaxFilter(3))   # drop specks
-    inner = m.filter(ImageFilter.MaxFilter(17))
-    ring = np.asarray(inner.filter(ImageFilter.MaxFilter(7))) > np.asarray(inner)
+    m = m.filter(ImageFilter.MaxFilter(25)).filter(ImageFilter.MinFilter(13))  # grow, close gaps
+    ImageDraw.floodfill(m, (0, 0), 128)                  # outside; whatever stays 0 is a hole
+    m = Image.fromarray(np.where(np.asarray(m) == 128, 0, 255).astype(np.uint8))
+    ring = np.asarray(m.filter(ImageFilter.MaxFilter(7))) > np.asarray(m)
     out = img.copy()
     out[ring] = (*colour, 255)
     return out
@@ -353,7 +383,7 @@ def outline(img, before, after, colour):
 def save(arr, crop, path):
     im = Image.fromarray(arr.clip(0, 255).astype(np.uint8), 'RGBA').crop(crop)
     im = im.resize((OUT_WIDTH, round(im.height * OUT_WIDTH / im.width)), Image.LANCZOS)
-    im.save(path, optimize=True)
+    im.save(path, quality=88, method=6)
 
 # ----------------------------------------------------------------------------------- output
 def main():
@@ -361,58 +391,122 @@ def main():
     ap.add_argument('--board', default=ROOT / 'pcb' / 'footswitch.kicad_pcb')
     ap.add_argument('--quality', default='high', choices=['high', 'basic'])
     ap.add_argument('--no-images', action='store_true', help='only write the text')
+    ap.add_argument('--pdf', action='store_true', help='also write OUT/build.pdf (needs Chrome)')
     ap.add_argument('--out', default=ROOT / 'docs', help='writes OUT/build.md and OUT/build/')
     a = ap.parse_args()
 
     board = Board(a.board)
     check(board)
     docs = Path(a.out)
+    docs.mkdir(parents=True, exist_ok=True)
     imgdir = docs / 'build'
     allrefs = set(board.fps)
     main_only = {r for s in STEPS if s.get('main_only') for r in s['refs']}
+    ext_only = {r for s in STEPS for r in s.get('ext_refs', [])}
 
-    images = {}         # name -> (fitted, present, chips, highlight refs, colour)
+    # name -> (fitted, present, chips, [(outlined refs, colour), ...]). The step pictures show
+    # the main board: the extension-only positions stay empty, outlined when they come up.
+    images = {}
     fitted, chips = set(), set()
     for i, s in enumerate(STEPS, 1):
         new = set(s['refs']) | set(s.get('highlight', [])) | set(s.get('chips', []))
         fitted |= set(s['refs']); chips |= set(s.get('chips', []))
-        s['img'] = f'{i:02d}-{s["slug"]}.png'
-        images[s['img']] = (set(fitted), allrefs, set(chips), new, NEW_COLOUR)
-    images['main-done.png'] = (set(fitted), allrefs, set(chips), set(), None)
-    images['extension-done.png'] = (fitted - main_only, allrefs, set(chips), main_only,
-                                    EMPTY_COLOUR)
+        s['img'] = f'{i:02d}-{s["slug"]}.webp'
+        marks = [(new, NEW_COLOUR)] + ([(set(s['ext_refs']), EMPTY_COLOUR)] if s.get('ext_refs') else [])
+        images[s['img']] = (set(fitted), allrefs, set(chips), marks)
+    images['main-done.webp'] = (set(fitted), allrefs, set(chips), [(ext_only, EMPTY_COLOUR)])
+    images['extension-done.webp'] = ((fitted - main_only) | ext_only, allrefs, set(chips),
+                                     [(main_only, EMPTY_COLOUR)])
 
     if not a.no_images:
         r = Renderer(board, a.quality)
         print('rendering', end='', flush=True)
-        full = r.render(fitted, allrefs, chips)
-        ys, xs = np.nonzero(full[:, :, 3])
-        pad = 20
-        crop = (max(xs.min() - pad, 0), max(ys.min() - pad, 0),
-                min(xs.max() + pad, full.shape[1]), min(ys.max() + pad, full.shape[0]))
+        full_key = r.key(fitted | ext_only, allrefs, chips)[0]
+        crop = None
+        # Everything that shapes a finished image besides its renders.
+        code = hashlib.sha1((inspect.getsource(outline) + inspect.getsource(save) +
+                             repr((OUT_WIDTH, NEW_COLOUR, EMPTY_COLOUR))).encode()).hexdigest()
         imgdir.mkdir(parents=True, exist_ok=True)
-        for name, (fit, present, ch, hl, colour) in images.items():
+        for name, (fit, present, ch, marks) in images.items():
+            parts = [code, full_key, r.key(fit, present, ch)[0]]
+            for hl, colour in marks:
+                if hl:
+                    parts += [repr(colour), r.key(fit - hl, present - hl, ch - hl, 'basic')[0],
+                              r.key(fit, present, ch, 'basic')[0]]
+            cached = CACHE / (hashlib.sha1(' '.join(parts).encode()).hexdigest() + '.webp')
+            if cached.exists():
+                shutil.copyfile(cached, imgdir / name)
+                continue
+            if crop is None:
+                full = r.render(fitted | ext_only, allrefs, chips)
+                ys, xs = np.nonzero(full[:, :, 3])
+                pad = 20
+                crop = (max(xs.min() - pad, 0), max(ys.min() - pad, 0),
+                        min(xs.max() + pad, full.shape[1]), min(ys.max() + pad, full.shape[0]))
             after = r.render(fit, present, ch)
-            if hl:
-                # "before": the highlighted footprints gone entirely (pads, silk and models).
-                # For the extension board: the main-only footprints gone, vs. present but empty.
-                before = r.render(fit - hl, present - hl, ch - hl)
-                after = outline(after, before, after, colour)
-            save(after, crop, imgdir / name)
-        for f in imgdir.glob('*.png'):
+            for hl, colour in marks:
+                if not hl: continue
+                # "before": the outlined footprints gone entirely (pads, silk and models).
+                # For empty positions: the footprints gone, vs. present but empty.
+                # The diff uses basic renders: they have no shadows, which would also change.
+                before = r.render(fit - hl, present - hl, ch - hl, quality='basic')
+                after = outline(after, before, r.render(fit, present, ch, quality='basic'), colour)
+            save(after, crop, cached)
+            shutil.copyfile(cached, imgdir / name)
+        for f in [*imgdir.glob('*.webp'), *imgdir.glob('*.png')]:
             if f.name not in images: f.unlink()
         shutil.rmtree(r.tmp)
         print(' done')
 
-    write_md(board, docs / 'build.md', main_only)
+    write_md(board, docs / 'build.md', main_only, ext_only)
     print(f'wrote {docs / "build.md"}' + ('' if a.no_images else f' and {len(images)} images'))
+    if a.pdf:
+        write_pdf(docs / 'build.md', docs / 'build.pdf')
+        print(f'wrote {docs / "build.pdf"}')
 
 
-def write_md(board, path, main_only):
+PDF_CSS = """
+@page { size: A4; margin: 15mm 15mm 18mm; }
+body { font: 10.5pt/1.45 "DejaVu Sans", sans-serif; color: #222; }
+h1 { font-size: 20pt; margin: 0 0 8pt; }
+h2 { font-size: 15pt; break-before: page; border-bottom: 1px solid #ccc; padding-bottom: 3pt; }
+h2:first-of-type { break-before: auto; }
+h3 { font-size: 12.5pt; break-before: page; margin-top: 0; }
+h2 + h3 { break-before: auto; }
+table { border-collapse: collapse; margin: 6pt 0 10pt; font-size: 9.5pt; }
+th, td { border: 1px solid #ccc; padding: 3pt 6pt; text-align: left; }
+th { background: #f2f2f2; }
+code { font-family: "DejaVu Sans Mono", monospace; font-size: 9pt; }
+pre { background: #f6f6f6; padding: 6pt; font-size: 8.5pt; white-space: pre-wrap; }
+img { display: block; max-width: 100%; max-height: 135mm; margin: 8pt auto; }
+hr { display: none; }
+"""
+
+
+def write_pdf(md_path, pdf_path):
+    """Markdown -> HTML (python-markdown) -> PDF (headless Chrome's print)."""
+    import markdown
+    text = re.sub(r'~~(.+?)~~', r'<del>\1</del>', md_path.read_text())   # not in python-markdown
+    body = markdown.markdown(text, extensions=['tables', 'fenced_code'])
+    html = md_path.with_name('.build-pdf.html')         # next to build.md, so image paths work
+    html.write_text(f'<!doctype html><meta charset="utf-8"><title>Build instructions</title>'
+                    f'<style>{PDF_CSS}</style>{body}')
+    chrome = next((c for c in ('google-chrome', 'chromium', 'chromium-browser')
+                   if shutil.which(c)), None)
+    if not chrome: sys.exit('no Chrome or Chromium found for --pdf')
+    try:
+        subprocess.run([chrome, '--headless', '--disable-gpu', '--no-pdf-header-footer',
+                        f'--print-to-pdf={pdf_path}', html.as_uri()],
+                       check=True, capture_output=True)
+    finally:
+        html.unlink()
+
+
+def write_md(board, path, main_only, ext_only):
     md = ['<!-- Generated by pcb/scripts/build_docs.py. Edit that script, not this file. -->',
           '# Build instructions', '', """\
-Every board is the same PCB. The **main board** gets a Pico and four extra resistors.
-**Extension boards** leave those out.
+Every board is the same PCB. The **main board** gets a Pico and four extra resistors, and
+only one of the two chain connectors. **Extension boards** get both connectors, but no Pico.
 
 All parts go on the **top side** (the side with the white labels). Solder on the bottom.
 Build from the lowest parts to the tallest, so the board lies flat on its parts while you
@@ -435,24 +529,57 @@ Soldering iron, solder, side cutters, multimeter. A vise or IDC crimp tool for t
         t = parts_table(board, s)
         if t: md += [t]
         md += [s['text'].strip(), '', f'![Step {i}](build/{s["img"]})', '']
-    md += ['**Main board done.**', '', '![Finished main board](build/main-done.png)', '',
+    md += ['**Main board done.**', '', f'{ref_list(ext_only)} stays empty (outlined).', '',
+           '![Finished main board](build/main-done.webp)', '',
            '---', '', '## Extension board', '']
     skip = [i for i, s in enumerate(STEPS, 1) if s.get('main_only')]
     md += [f'Same PCB, same steps, but **skip steps {", ".join(map(str, skip[:-1]))} and '
-           f'{skip[-1]}**. Leave {ref_list(main_only)} empty (outlined below).', '',
+           f'{skip[-1]}**. Leave {ref_list(main_only)} empty (outlined below), but do fit '
+           f'{ref_list(ext_only)}.', '',
            '| Step | Do | Parts |', '|------|----|-------|']
     for i, s in enumerate(STEPS, 1):
         parts = ', '.join(
-            [f'{len(rs)} × {d.split(":")[0]}' for d, rs in group(board, s['refs']).items()] +
+            [f'{len(rs)} × {d.split(":")[0]}'
+             for d, rs in group(board, s['refs'] + s.get('ext_refs', [])).items()] +
             [f'{q} × {board.fps[c]["value"]}' for q, c in ((1, c) for c in s.get('chips', []))] +
             [f'{q} × {d}' for q, d in s.get('extra', [])]) or 'none'
         if s.get('main_only'):
             md.append(f'| ~~{i}~~ | ~~{s["title"]}~~ | skip |')
         else:
             md.append(f'| {i} | {s["title"]} | {parts} |')
-    md += ['', '![Finished extension board](build/extension-done.png)', '',
-           '**Repeat for every extension board.**', '', '---', '', CABLES]
+    md += ['', '![Finished extension board](build/extension-done.webp)', '',
+           '**Repeat for every extension board.**', '', '---', '', CABLES, '---', '']
+    md += mechanical()
     path.write_text('\n'.join(md))
+
+
+def mechanical():
+    """The enclosure steps. Texts from mech/assembly_steps.py, which also renders their
+    pictures into docs/build/mech/ (run it separately: it needs cadquery)."""
+    sys.path.insert(0, str(ROOT / 'mech'))
+    import assembly_steps as m
+    md = [f'## Mechanical assembly ({m.N} buttons)', '', MECH_INTRO.format(n=m.N, n_ext=m.N - 1)]
+    for i, s in enumerate(m.STEPS, 1):
+        md += [f'### Step M{i}: {s["title"]}', '']
+        if s['parts']:
+            md += ['| Part | Qty |', '|------|-----|'] + [f'| {d} | {q} |' for q, d in s['parts']] + ['']
+        md += [s['text'].strip(), '']
+        for j in range(len(s['views'])):
+            md += [f'![Step M{i}](build/mech/{m.image_name(i, s, j)})', '']
+    return md
+
+
+MECH_INTRO = """\
+The unit is a sandwich: the boards sit on the back plate, and the front plate sits on the
+standoff columns. The sides stay open. The steps below are for {n} buttons: one main board
+and {n_ext} extension boards. For more buttons, use the longer plates and more of the same
+hardware per board.
+
+**Orientation:** footswitches towards you, the main board (with the Pico) at the right-hand
+end. In each picture, the parts of that step are outlined.
+
+**Tools:** 2 mm hex key (or the driver for your screws), 14 mm spanner.
+"""
 
 
 def group(board, refs):
@@ -470,7 +597,7 @@ CABLES = """\
 | Part | Qty per cable |
 |------|---------------|
 | 2×4 IDC socket | 2 |
-| 8-way ribbon, OUT-to-IN distance + 2–3 cm slack | 1 |
+| 8-way ribbon, about 10 cm (OUT to the next IN is 88 mm, centre to centre) | 1 |
 
 1. Cut the ribbon square.
 2. Lay it in the IDC socket, with the **red wire on the pin 1 side** (marked ▼ on the socket).
@@ -485,11 +612,12 @@ CABLES = """\
 [Extension 2] IN ◄──cable── OUT [Extension 1] IN ◄──cable── OUT [Main board]
 ```
 
-1. Main board **OUT** (J2, left) → first extension board **IN** (J1, right).
+1. Main board **OUT** (J2, top-left corner) → **IN** (J1, the header right of OUT) of the
+   first extension board, to its left. The cable runs straight along the top edge.
 2. That board's **OUT** → the next board's **IN**. Repeat.
-3. The main board's IN and the last board's OUT stay empty.
-4. Plug USB into the Pico. Check J3 on the **last** board: pin 14 to pin 16 ≈ 5 V,
-   pin 13 to pin 16 ≈ 3.3 V.
+3. The last board's OUT stays empty. (The main board has no IN.)
+4. Plug USB into the Pico. Check J2 (OUT, empty) on the **last** board: pin 1 to pin 2 ≈ 5 V,
+   pin 3 to pin 2 ≈ 3.3 V.
 """
 
 if __name__ == '__main__':

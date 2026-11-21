@@ -121,4 +121,9 @@
 		(uuid "ddee886f-59ba-4604-ab6b-96f366a626ce")
 	)
 	(embedded_fonts no)
+	(model "${KIPRJMOD}/footswitches.3dshapes/PBS24-202P.step"
+		(offset (xyz 0 0 0))
+		(scale (xyz 1 1 1))
+		(rotate (xyz 0 0 0))
+	)
 )

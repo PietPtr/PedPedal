@@ -1,0 +1,24 @@
+# Rust
+target/
+
+# Python / uv
+.venv/
+__pycache__/
+*.pyc
+
+# KiCad: lock files, automatic backups, per-user UI state, caches
+*.lck
+*-backups/
+*.kicad_prl
+fp-info-cache
+_autosave-*
+*.bak
+
+# LibreOffice lock files
+.~lock.*#
+
+# Generated output (rebuild with the scripts)
+mech/out/
+docs/build.pdf
+pcb/gerbers/
+pcb/gerbers.zip

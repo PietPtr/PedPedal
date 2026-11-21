@@ -1,0 +1,7 @@
+# Host-side workspace: the shared core crate and the driver library.
+# The firmware (firmware/) is a separate build for thumbv6m-none-eabi; build it from its own
+# directory so its .cargo/config.toml (target, linker, runner) applies.
+[workspace]
+resolver = "3"
+members = ["core", "driver"]
+exclude = ["firmware"]
