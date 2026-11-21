@@ -5,18 +5,30 @@ footswitch and one RGB LED. Modules are chained with short ribbon cables. Only t
 first module has a Raspberry Pi Pico (RP2040) fitted. The Pico's USB port is the MIDI interface.
 Firmware and host software are written in Rust.
 
-All boards sit in one enclosure. Everything is through-hole and hand-soldered.
+All boards sit in one enclosure. There are two versions of the module board, with the same
+circuit, outline and mounting holes:
+
+- **THT board** (`pcb/`): everything through-hole and hand-soldered. Most of this document
+  describes it.
+- **SMD board** (`pcb-jlc/`): JLCPCB assembles the SMD parts; only the footswitch, the LED and
+  the Pico are hand-soldered. See [SMD board for JLCPCB assembly](#smd-board-for-jlcpcb-assembly).
+
+Both versions can be mixed in one chain.
 
 ## Files
 
 - `pcb/footswitch.kicad_pro`, `pcb/footswitch.kicad_sch`, `pcb/footswitch.kicad_pcb`: the
   KiCad project, the schematic (one A3 sheet) and the board.
+- `pcb-jlc/`: the SMD version for JLCPCB assembly, with its own scripts and the order files in
+  `pcb-jlc/fab/`. See [SMD board for JLCPCB assembly](#smd-board-for-jlcpcb-assembly).
 - `pcb/footswitch.kicad_dru`: a custom design rule. GND pads that also have a track need only
   one thermal spoke to the ground pour.
 - `pcb/footswitches.pretty/PBS24-202P.kicad_mod`: footprint for the footswitch. It isn't in
   the KiCad library. The project's `fp-lib-table` registers it as `footswitches`.
 - `mech/plates.py`: generates the laser-cut front and back plate DXFs in `mech/out/`. Run it
   with `uv run` (the repository's `pyproject.toml` holds the Python dependencies).
+- `mech/tub.py`: generates the optional injection-moulded tub (STEP and STL in `mech/out/`)
+  that replaces the back plate and walls; see [Moulded tub](#moulded-tub-option).
 - `mech/walls.py`: generates the optional 3D-printed side walls as STLs in `mech/out/`
   (`uv run --group dev`, needs cadquery).
 - `pcb/scripts/`: the scripts that generated the schematic and the board and ran the
@@ -263,6 +275,71 @@ The board is 80 × 86 mm. Seen from the top (component side, facing the enclosur
 - Two copper layers, with a GND pour on both. Routed with Freerouting: signal tracks 0.3 mm,
   power 0.6 mm, 0.2 mm clearance, vias 0.8/0.4 mm.
 
+## SMD board for JLCPCB assembly
+
+`pcb-jlc/` holds a second version of the board, for JLCPCB's Economic PCBA service. It has
+the same schematic and nets as the THT board, with SMD parts in place of the through-hole
+ones. JLCPCB fits all SMD parts on the top side. The footswitch, the LED and the Pico stay
+through-hole and are hand-soldered.
+
+- **Same positions:** the board outline, the four mounting holes, the footswitch (SW1), the
+  LED (D1) and the Pico (U3) are at exactly the same coordinates as on the THT board, so the
+  plates, the LED spacer and the walls fit both. The chain connectors keep their 12 mm spacing
+  (so the cable is the same) but sit 0.6 mm further right, which keeps J2's SMD pads 1 mm from
+  the board edge.
+- **Parts:** all from JLCPCB's parts library. Basic parts wherever one exists, because they
+  have no loading fee. See [bom.md](bom.md#smd-board-jlcpcb-assembly) for the list.
+  - 74HC165 and 74HC595 in SOIC-16. Same parts, same 3.3 V supply.
+  - The 2N2222A drivers become MMBT2222A (SOT-23), the same die. The SOT-23 pin numbering is
+    B-E-C instead of the TO-92's E-B-C, so the schematic uses KiCad's MMBT2222A symbol.
+  - Resistors and capacitors in 0805. C4 becomes a 10 µF 25 V ceramic (no polarity).
+  - **Chain connectors:** SMD 2×4 shrouded box headers, 8.9 mm tall (the THT ones are 9.1 mm),
+    so the same IDC ribbon cables plug in. The footprint
+    (`pcb-jlc/footswitches.pretty/IDC-Header_2x04_P2.54mm_Vertical_SMD_JLC`) follows JLC's
+    land pattern (1.02 × 4.65 mm pads, row centres 6.85 mm apart), which differs from KiCad's
+    SMD IDC footprint. The key notch is on the pin 1 (odd pin) side, as on the THT header.
+- **Fitted on every module:** JLCPCB assembles all boards the same way, so R5–R8 and J1 are
+  fitted on module 1 and on the others. That is harmless: on modules without a Pico, R5–R8
+  connect to empty Pico pads, and on module 1 the IN header just stays empty. Don't plug a cable
+  into module 1's IN.
+- **Layout:** U1 and U2 sit where the DIPs were, each with its decoupling capacitor above it.
+  The LED drivers form three columns under the LED: LED resistor, transistor, base resistor.
+  C3, R4 and R9 are left of U1, and R5–R8 are under the connectors, next to the Pico.
+  No SMD parts under the Pico or the footswitch. Same routing rules as the THT board.
+- **Hand soldering:** the footswitch, LED and Pico header pins are soldered from the bottom.
+  The SMD parts are all on top, so the bottom side is free for the iron and the 5 mm standoffs.
+
+### Files and scripts
+
+- `pcb-jlc/footswitch_jlc.kicad_{pro,sch,pcb,dru}`: the KiCad project. The schematic has an
+  `LCSC` field on every part; it is empty on the hand-soldered parts.
+- `pcb-jlc/scripts/to_smd.py`: the one-off script that turned the copied THT schematic into
+  this one (footprints, LCSC numbers, the transistor symbol). The schematic is now the source of
+  truth.
+- `pcb-jlc/scripts/pcbgen_jlc.py` and `run.sh WORKDIR`: generate, autoroute and DRC the
+  board, like the THT scripts (they reuse `sx.py`, `fpinfo.py` and `sesimport.py` from
+  `pcb/scripts/`). They also remove Freerouting's dangling stubs. Regenerating discards edits
+  made in KiCad.
+- `pcb-jlc/scripts/fab.py`: writes the order files to `pcb-jlc/fab/`:
+  `footswitch_jlc-gerbers.zip` (gerbers and drill files), `footswitch_jlc-bom.csv` and
+  `footswitch_jlc-cpl.csv` in JLCPCB's column format. All coordinates are from the board's
+  bottom-left corner. The CPL rotations include JLC's offsets: +270° for SOIC-16 and the box
+  header, +180° for SOT-23. These come from comparing JLC's own footprints with KiCad's.
+
+DRC: no unconnected pads, and the same harmless LED silkscreen warning as the THT board. With
+`--schematic-parity` both boards also give 26 `ki_fp_filters` field warnings, which don't
+affect the board. ERC passes.
+
+### Ordering at JLCPCB
+
+1. Upload `footswitch_jlc-gerbers.zip`. 2 layers, 1.6 mm, any colour; the defaults are fine.
+2. Turn on PCB Assembly: Economic, top side. Upload the BOM and CPL.
+3. On the placement preview, check the pin 1 dot of U1, U2, Q1–Q3 and **J1/J2** against the
+   silkscreen. The header's key notch must face left (the odd pins, the side of the silkscreen
+   pin 1 mark). If JLC shows a part turned, rotate it in the preview; that doesn't change the
+   files.
+4. Through-hole parts are not in the BOM. Solder SW1, D1 and (module 1 only) the Pico yourself.
+
 ## Mechanical
 
 - **Pitch: 10 cm** between switches. The PCB is 80 mm wide, so there is a gap of 20 mm
@@ -448,6 +525,76 @@ mech/walls.py 4 8` writes the STLs (`walls_N_end_left.stl`, `walls_N_end_right.s
   build guide has it as its own section at the end (steps W1–W4), for a finished unit. To take
   the walls off, take the front plate off.
 
+### Moulded tub (option)
+
+An injection-moulded tub can replace the back plate and the side walls. The front plate, the
+columns and the boards stay the same. Everything gets assembled onto the front plate as before.
+That unit then drops into the tub, and screws from underneath hold it in. `uv run --group dev
+mech/tub.py 4 8` writes `mech/out/tub_N.step` (send this to the moulder) and `tub_N.stl`, plus
+check renders `tub_N_{top,bottom,usb,section}.png`. `uv run --group dev mech/assembly.py 4
+--tub` writes the whole unit in the tub (`assembly_4_tub.*`, renders `assembly_4_tub_{front,
+bottom,inside,usb}.png`). Every dimension is an option (`--help`), and the script checks them
+and refuses a tub that fails.
+
+```
+         lip  rebate
+          ┌┐ ┌──────────────────── front plate, top flush with the rim
+          ││ │ ══════════════════
+          │└─┤ ledge (0.3 mm under the plate)
+          │  │      ║ 25 mm F-F standoff
+          │  │  ════╬═══════════   PCB
+          │  │      ▓ 5+6 mm M-F standoff
+          │  │    ┌─┴─┐            boss
+          │  └────┘   └──┬──rib──
+          └──────────[screw]─────  floor: M3 × 8 head in a pocket, 0.3 mm under the bottom face
+```
+
+- **Size:** 393.4 × 99.4 × 40.6 mm for 4 modules, 793.4 × 99.4 mm for 8. That is 3 mm taller
+  than the plate sandwich, because the boss under each column is 3 mm taller than the back plate
+  (see *Columns*). About 196 g of ABS for 4 modules and 380 g for 8.
+- **Front plate:** the same laser-cut plate (`frontplate_N.dxf`), dropped into a rebate round
+  the top of the tub with 0.2 mm clearance each side, its top flush with the rim. Its edge
+  overlaps a 0.8 mm ledge, which sits 0.3 mm under the plate. The columns set the height, and
+  the plate only rests on the ledge if its edge is stepped on. This also supports the 32 mm
+  overhang behind the back row of columns. The rebate locates the plate, so the columns land
+  on their bosses by themselves.
+- **Moulding:** 2.5 mm walls and floor everywhere, with a 1.5° draft on every face along the
+  pull. The lip round the plate is 1.5 mm. The tub is wider at the rim than at the bottom, and
+  it comes out of a plain two-part tool (core inside, cavity outside, parting line at the rim)
+  with one exception: the USB opening needs a side action. The outside bottom edge is rounded at
+  3.5 mm and the inside corner at 1 mm, which keeps the wall even round the corner. 1.5° of
+  draft is enough for a light texture (MT-11010 or similar) outside. Material: ABS or PC/ABS.
+  Gate and ejector-pin marks can go on the inside of the floor, which nobody sees.
+- **Columns:** the M-F standoff stands on a boss (7.5 mm across, top 6 mm above the bottom)
+  instead of on the back plate. An **M3 × 8 button-head** screw comes up through the boss into
+  the standoff's female end: 4.05 mm of plastic under the head, 3.95 mm of thread in the 5 mm
+  standoff. Its head sits in a 6.6 mm pocket in the bottom, 0.3 mm under the bottom face, so the
+  bottom is flat. The boss top has a 0.4 mm lead-in chamfer. The PCB underside is 11 mm above
+  the bottom.
+- **Ribs:** a grid, 1.5 mm thick (60 % of the wall, against sink marks on the bottom) and as
+  tall as the bosses. It runs along both rows of columns and across at every column and under
+  every switch, from wall to wall. It stiffens the floor and carries a stomp from the bosses to
+  the walls and feet. The cut leads (3 mm) clear the ribs by 2 mm.
+- **USB opening:** in the right-hand wall, on the Pico's centre line: a 13 × 7 mm stadium with
+  a 0.75 mm 45° chamfer outside, centred 5.1 mm above the main PCB's top. That is the centre of
+  the port with the Pico soldered on its headers. With the Pico in female sockets the port sits
+  about 8.4 mm higher: use `--usb-z 13.5`. The port's mating face is 6.6 mm inside the outer
+  face, as long as a USB-C plug's metal shell. The opening is large enough for the plug's
+  overmould (about 12 × 6.5 mm) to go in as far as needed. Very bulky overmoulds won't fit. The
+  genuine Pico 1 has micro-USB, whose plugs also fit; a USB-C port needs a Pico-compatible
+  board with USB-C in the same position.
+- **Feet:** 2 per module, as on the back plate (under each switch), but 10 mm in from the
+  front and back edges, clear of the rounded bottom edge. They sit in 0.5 mm recesses, 12.6 mm
+  across, so they go on straight.
+- **Assembly:** build the front-plate unit as in steps M1–M5 (columns, boards, cables), but
+  with no back plate. Lower it into the tub, Pico end at the USB opening. Turn the unit over
+  and screw in the 4N M3 × 8 screws from underneath. To take it apart, remove the screws and
+  lift the unit out by the switches.
+- **Cost:** a mould for a 400 mm part is a big tool, and the tub's length depends on N, so
+  every module count needs its own mould (one for 4 modules and one for 8). A small run is
+  cheaper as a printed tub (the STL prints as is, upright, on a large enough printer) or as
+  urethane casting.
+
 ## Open items
 
 - [ ] **Check the PBS24-202P against its datasheet** when the switches arrive: measure the pin
@@ -455,6 +602,12 @@ mech/walls.py 4 8` writes the STLs (`walls_N_end_left.stl`, `walls_N_end_right.s
       when pressed. Cheap parts don't always match their drawings.
 - [ ] **LED:** must be common anode. Check the lead order against the footprint.
 - [ ] **Transistors:** check the 2N2222A pinout of the parts you buy.
+- [ ] **SMD board, first JLC order:** check the part orientations in JLC's placement preview
+      (see [Ordering at JLCPCB](#ordering-at-jlcpcb)), and plug a cable into one board before
+      fitting the rest, to confirm the box header's notch direction.
+- [ ] **SMD box header stock:** C56143593 had 230 in stock (2 per board). If it runs out, use
+      C41376027 (same land pattern, 8.9 mm, about 2900 in stock); it has no JLC footprint, so
+      check its rotation in the preview carefully.
 - [ ] **Front plate:** before cutting the whole set, cut a one-module test piece
       (`uv run mech/plates.py 1`) and check the switch, LED and standoff fit.
 - [ ] **Plate material:** choose it, and rerun the generator with `--panel-thickness` if it

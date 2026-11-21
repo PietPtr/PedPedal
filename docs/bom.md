@@ -1,7 +1,9 @@
 # Bill of materials
 
-All parts are through-hole, chosen for hand soldering. See [design.md](design.md) for how they
-are used.
+The tables below are for the **THT board** (`pcb/`): all parts through-hole, chosen for hand
+soldering. The **SMD board** (`pcb-jlc/`), assembled by JLCPCB, has its own list under
+[SMD board (JLCPCB assembly)](#smd-board-jlcpcb-assembly); the cables, the Pico and the
+enclosure parts are the same for both. See [design.md](design.md) for how they are used.
 
 There is one PCB design. **Every module** gets the parts in the first table. **Module 1** also
 gets the parts in the second table.
@@ -102,11 +104,101 @@ Optional side walls, 3D printed from `mech/walls.py` (see
 | 2N − 4 | Wall, straight | 100 × 6 × 37.6 mm | `walls_N_straight.stl`: 4 for 4 modules, 12 for 8 | Print |
 | 4N − 4 | Alignment pin | 1.75 mm filament, 11 mm | Two per joint | Have |
 
+Optional moulded tub instead of the back plate and walls (see
+[design.md](design.md#moulded-tub-option)). The columns and front plate are the same; these
+parts change:
+
+| Qty | Part | Size | Notes | Status |
+|-----|------|------|-------|--------|
+| 1 | Tub, injection moulded | 393.4 × 99.4 × 40.6 mm / 793.4 × 99.4 × 40.6 mm | ABS or PC/ABS, from `mech/out/tub_N.step`. Replaces the back plate and the side walls | Quote |
+| 4N | Screw, tub to short standoff | M3 × 8 mm, button head (ISO 7380) | Instead of the 4N M3 × 6 bottom screws. 4 mm boss + 4 mm into the short standoff; the head sits in a pocket in the bottom | Order |
+| 2N | Rubber foot, stick-on | 12 mm across | Same feet, in the recesses in the bottom. Optional: the bottom is flat | Order |
+
 The lengths above are for 3 mm plates. For other sizes, run
 `uv run mech/plates.py N --panel-thickness T --pcb-spacer L --top-screw S --bottom-screw S`: it prints the LED spacer, screw
 and spacer numbers for that stack and refuses combinations that don't fit.
 
+## SMD board (JLCPCB assembly)
+
+For `pcb-jlc/`. JLCPCB fits the parts in the first table on every board, from its own parts
+library. The order files are `pcb-jlc/fab/footswitch_jlc-bom.csv` and `-cpl.csv`
+(regenerate them with `python3 pcb-jlc/scripts/fab.py`). Prices and stock are from JLCPCB's
+parts search on 2026-11-21, per part at the 1–49 price.
+
+**Library type:** *Basic* parts have no loading fee. *Preferred extended* parts have no fee on
+Economic assembly either. *Extended* parts cost a one-off loading fee per part number per order
+(about $3). Only the box header is Extended.
+
+| Ref | Qty | Part | Value | Package | LCSC | Manufacturer part | Library | Price |
+|-----|-----|------|-------|---------|------|-------------------|---------|-------|
+| U1 | 1 | 8-bit PISO shift register | 74HC165 | SOIC-16 | C5613 | Nexperia 74HC165D,653 | Preferred extended | $0.100 |
+| U2 | 1 | 8-bit SIPO shift register | 74HC595 | SOIC-16 | C5947 | Nexperia 74HC595D,118 | Basic | $0.102 |
+| Q1–Q3 | 3 | NPN transistor (LED drivers) | MMBT2222A | SOT-23 | C8512 | MMBT2222A 1P | Basic | $0.018 |
+| R1 | 1 | Resistor (LED red) | 560 Ω 1% | 0805 | C28636 | UNI-ROYAL 0805W8F5600T5E | Basic | $0.003 |
+| R2, R3 | 2 | Resistor (LED green, blue) | 390 Ω 1% | 0805 | C17655 | UNI-ROYAL 0805W8F3900T5E | Basic | $0.002 |
+| R4, R9 | 2 | Pull-down (SW_DATA), pull-up (footswitch) | 10 kΩ 1% | 0805 | C17414 | UNI-ROYAL 0805W8F1002T5E | Basic | $0.003 |
+| R5–R8 | 4 | Series resistors (Pico lines) | 33 Ω 1% | 0805 | C17634 | UNI-ROYAL 0805W8F330JT5E | Basic | $0.005 |
+| R16–R18 | 3 | Base resistors | 4.7 kΩ 1% | 0805 | C17673 | UNI-ROYAL 0805W8F4701T5E | Basic | $0.003 |
+| C1–C3 | 3 | Decoupling, debounce | 100 nF 50 V X7R | 0805 | C49678 | YAGEO CC0805KRX7R9BB104 | Basic | $0.014 |
+| C4 | 1 | Bulk (5V) | 10 µF 25 V X5R | 0805 | C15850 | Samsung CL21A106KAYNNNE | Basic | $0.031 |
+| J1, J2 | 2 | Chain connector, SMD 2×4 shrouded box header, 8.9 mm | 2.54 mm | SMD | C56143593 | HC-JN254-8.9L-2x4PS-02A-Y | Extended | $0.115 |
+
+That is about $0.60 of parts per board, plus JLCPCB's assembly setup, stencil and the one
+Extended-part fee.
+
+- **J1, J2 stock:** C56143593 had only 230 in stock, enough for 115 boards. The alternative
+  is C41376027 (hanxia HX JN2.54-2x4P TP H8.9, same land pattern, about 2900 in stock,
+  $0.19). It has no footprint in JLC's library, so check its orientation in the placement
+  preview. Change the `LCSC` field of J1 and J2 in the schematic and rerun `fab.py`.
+- **R5–R8 and J1 are fitted on every board.** See [design.md](design.md#smd-board-for-jlcpcb-assembly).
+
+### Everything for an N-module unit (SMD boards)
+
+The full shopping list for a unit of N modules built from SMD boards: the assembled boards, the
+parts you solder yourself, the cables, the mounting hardware and the cut and printed parts.
+Nothing else from the THT tables above is needed. Part details are in the THT tables (same parts)
+and in [aliexpress.md](aliexpress.md).
+
+| Item | Qty for N | N = 4 | N = 8 | Notes |
+|------|-----------|-------|-------|-------|
+| **Boards** | | | | |
+| SMD board, assembled by JLCPCB | N | 4 | 8 | `pcb-jlc/fab/` files, parts from the table above. JLC makes at least 5 PCBs per order; you choose how many of them it assembles |
+| **Hand-soldered on every board** | | | | |
+| Footswitch PBS24-202P, momentary (SW1) | N | 4 | 8 | Comes with 2 M12 nuts and 2 washers each |
+| RGB LED, 5 mm, common anode, diffused (D1) | N | 4 | 8 | Buy a few spares |
+| **Module 1 only** | | | | |
+| Raspberry Pi Pico 1 (U3) | 1 | 1 | 1 | Pico 1 (RP2040), not Pico 2 |
+| Pin header 1×20, 2.54 mm | 2 | 2 | 2 | For the Pico |
+| Female socket 1×20, 2.54 mm | 2 | 2 | 2 | Optional, makes the Pico removable |
+| Micro-USB cable | 1 | 1 | 1 | Power and data to the computer |
+| **Between modules** | | | | |
+| FC-8P to FC-8P ribbon cable, 10 cm, pin 1 to pin 1 | N − 1 | 3 | 7 | Module 1's IN header stays empty |
+| **Mounting hardware** | | | | |
+| Hex standoff, female-female, M3 × 25 mm, brass or steel | 4N | 16 | 32 | Front plate to PCB |
+| Hex standoff, male-female, M3 × 5 mm + 6 mm stud, brass | 4N | 16 | 32 | Under the PCB, stud up. Trim the switch, LED and Pico pins under the PCB to 3 mm or less |
+| Screw M3 × 6 mm, button head (ISO 7380) | 8N | 32 | 64 | 4 per module on the front plate, 4 on the back plate |
+| LED spacer for 5 mm LED, 19 mm | N | 4 | 8 | |
+| Rubber foot, stick-on, 12 mm across, 3+ mm tall | 2N | 8 | 16 | |
+| **Laser cut (3 mm acrylic)** | | | | |
+| Front plate | 1 | 1 | 1 | (100N − 10) × 96 mm: 390 × 96 / 790 × 96. `mech/out/frontplate_N.dxf` |
+| Back plate | 1 | 1 | 1 | Same size. `mech/out/backplate_N.dxf` |
+| **Optional side walls (3D printed, PETG or PLA)** | | | | |
+| Wall end cap, left | 1 | 1 | 1 | `mech/out/walls_N_end_left.stl` |
+| Wall end cap, right, with USB cutout | 1 | 1 | 1 | `mech/out/walls_N_end_right.stl` |
+| Wall, straight | 2N − 4 | 4 | 12 | `mech/out/walls_N_straight.stl` |
+| Alignment pin, 1.75 mm filament, 11 mm | 4N − 4 | 12 | 28 | Two per joint, cut from filament |
+| **Optional moulded tub (instead of the back plate and walls)** | | | | |
+| Tub, injection moulded, ABS | 1 | 1 | 1 | `mech/out/tub_N.step`, one mould per length |
+| Screw M3 × 8 mm, button head (ISO 7380) | 4N | 16 | 32 | Instead of the 4N M3 × 6 back-plate screws |
+
+Compared with the THT board, the SMD board needs no IC sockets, no resistors, capacitors or
+transistors, and no loose box headers: JLCPCB fits J1 and J2 on every board. The plate sizes and
+hardware assume 3 mm plates; for other thicknesses, see the `mech/plates.py` note above.
+
 ## Totals for N modules
+
+These totals are for the THT board. For SMD boards, see
+[Everything for an N-module unit](#everything-for-an-n-module-unit-smd-boards).
 
 [bom.ods](bom.ods) works these out with whole lots and prices: fill in the number of main and
 extra boards at the top. Its *Scenarios* sheet lists the cost per board for 1–4 main boards and

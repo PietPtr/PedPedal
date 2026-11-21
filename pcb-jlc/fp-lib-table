@@ -1,0 +1,4 @@
+(fp_lib_table
+	(version 7)
+	(lib (name "footswitches") (type "KiCad") (uri "${KIPRJMOD}/footswitches.pretty") (options "") (descr "Project footprints"))
+)

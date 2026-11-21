@@ -1,0 +1,7 @@
+(version 1)
+
+# GND pads are routed with tracks as well as connected to the pours, so one
+# thermal spoke is enough where a track blocks the others.
+(rule "gnd_thermal_spokes"
+	(condition "A.NetName == 'GND'")
+	(constraint min_resolved_spokes 1))

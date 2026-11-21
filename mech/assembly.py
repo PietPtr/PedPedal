@@ -25,6 +25,8 @@ import cadquery as cq
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import plates  # noqa: E402
 from plates import HEX_R, Params  # noqa: E402
+import tub as tub_mod  # noqa: E402
+from tub import TubParams  # noqa: E402
 import walls  # noqa: E402
 from walls import WallParams  # noqa: E402
 
@@ -167,13 +169,15 @@ def _origin():
 
 # ---------------------------------------------------------------- assembly
 
-def build(n, p, board, workdir, wall_params=None):
-    """The whole unit. With `wall_params`, also the printed walls (named wall_*)."""
+def build(n, p, board, workdir, wall_params=None, tub_params=None):
+    """The whole unit. With `wall_params`, also the printed walls (named wall_*). With
+    `tub_params`, the moulded tub (named tub) instead of the back plate, with the columns on its
+    bosses and the bottom screws in its pockets."""
     W, H, front, back, boards, feet = plates.layout(n, p, board)
     T = p.panel_thickness
-    # z = 0 at the back plate's underside
-    z_back_top = T
-    z_pcb_bot = T + p.pcb_spacer
+    # z = 0 at the back plate's (or the tub's) underside
+    z_back_top = tub_params.boss_top if tub_params else T
+    z_pcb_bot = z_back_top + p.pcb_spacer
     z_pcb_top = z_pcb_bot + p.pcb_thickness
     z_front = z_pcb_top + p.standoff               # front plate underside
     led_lift = p.standoff + T + p.led_proud - p.led_height
@@ -187,7 +191,10 @@ def build(n, p, board, workdir, wall_params=None):
     ext = Assy.importStep(str(ext_step))
 
     a = Assy(name=f'footswitch_{n}')
-    a.add(plate(W, H, back, p), name='back_plate', color=C_PLATE)
+    if tub_params:
+        a.add(tub_mod.build(n, p, tub_params, board), name='tub', color=C_WALL)
+    else:
+        a.add(plate(W, H, back, p), name='back_plate', color=C_PLATE)
     a.add(plate(W, H, front, p), name='front_plate', color=C_PLATE, loc=cq.Location((0, 0, z_front)))
 
     for i, (bx, by, bw, bh) in enumerate(boards):
@@ -198,7 +205,8 @@ def build(n, p, board, workdir, wall_params=None):
     standoff = hex_spacer(p.standoff)
     spacer = mf_up(p.pcb_spacer, p.stud)
     screw_top = button_screw(p.top_screw)
-    screw_bot = button_screw(p.bottom_screw)
+    screw_bot = button_screw(tub_params.screw if tub_params else p.bottom_screw)
+    z_screw_bot = tub_mod.heights(p, tub_params)['pocket'] if tub_params else 0
     nut_, washer_ = nut(14, p.switch_nut, 12), washer(18, 12.2, p.switch_washer)
     lsp = led_spacer(led_lift)
     for k, (x, y, d, kind) in enumerate(front):
@@ -207,7 +215,7 @@ def build(n, p, board, workdir, wall_params=None):
             a.add(spacer, name=f'pcb_spacer_{k}', color=C_BRASS, loc=cq.Location((x, y, z_back_top)))
             a.add(screw_top, name=f'screw_top_{k}', color=C_STEEL, loc=cq.Location((x, y, z_front + T)))
             a.add(screw_bot, name=f'screw_bottom_{k}', color=C_STEEL,
-                  loc=cq.Location((x, y, 0), (1, 0, 0), 180))
+                  loc=cq.Location((x, y, z_screw_bot), (1, 0, 0), 180))
         elif kind == 'switch':
             a.add(washer_, name=f'switch_washer_low_{k}', color=C_STEEL,
                   loc=cq.Location((x, y, z_front - p.switch_washer)))
@@ -219,8 +227,11 @@ def build(n, p, board, workdir, wall_params=None):
         elif kind == 'led':
             a.add(lsp, name=f'led_spacer_{k}', color=C_SPACER, loc=cq.Location((x, y, z_pcb_top)))
 
+    if tub_params:
+        feet = tub_mod.feet(n, p, tub_params, board, H)
+    z_feet = tub_params.foot_recess if tub_params else 0
     for k, (x, y) in enumerate(feet):
-        a.add(foot(), name=f'foot_{k}', color=C_RUBBER, loc=cq.Location((x, y, 0)))
+        a.add(foot(), name=f'foot_{k}', color=C_RUBBER, loc=cq.Location((x, y, z_feet)))
 
     # Chain cables: OUT (J2) of module i+1 to IN (J1) of module i. Both headers sit side by side
     # at the top left, so the ribbon runs straight along the top edge to the next module.
@@ -252,8 +263,9 @@ def build(n, p, board, workdir, wall_params=None):
 
 # ---------------------------------------------------------------- check renders (VTK, off screen)
 
-def render(a, png, view, size=(1600, 900), hide=(), zoom=1.3, focus=None, dist=None):
-    """`focus` (x, y, z) and `dist` aim the camera at a point instead of the whole unit."""
+def render(a, png, view, size=(1600, 900), hide=(), zoom=1.3, focus=None, dist=None, fine=False):
+    """`focus` (x, y, z) and `dist` aim the camera at a point instead of the whole unit. `fine`
+    tessellates finer, for close-ups of small round features."""
     import vtk
     from cadquery.occ_impl.assembly import toVTKAssy
 
@@ -263,7 +275,8 @@ def render(a, png, view, size=(1600, 900), hide=(), zoom=1.3, focus=None, dist=N
             sub.add(child, name=child.name, loc=child.loc)
     ren = vtk.vtkRenderer()
     ren.SetBackground(1, 1, 1)
-    for actor in toVTKAssy(sub, edges=False, tolerance=0.2, angularTolerance=0.3):
+    for actor in toVTKAssy(sub, edges=False, tolerance=0.02 if fine else 0.2,
+                                angularTolerance=0.05 if fine else 0.3):
         ren.AddActor(actor)
     win = vtk.vtkRenderWindow()
     win.SetOffScreenRendering(1)
@@ -300,27 +313,43 @@ def main():
     ap.add_argument('--out', default=ROOT / 'mech' / 'out', type=Path)
     ap.add_argument('--no-renders', dest='renders', action='store_false')
     ap.add_argument('--no-walls', dest='walls', action='store_false', help='leave out the printed side walls')
-    for cls in (Params, WallParams):
+    ap.add_argument('--tub', action='store_true', help='the moulded tub (tub.py) instead of the back plate '
+                    'and walls; writes assembly_N_tub.*')
+    for cls in (Params, WallParams, TubParams):
         for f in fields(cls):
             ap.add_argument(f'--{f.name.replace("_", "-")}', type=float, default=f.default)
     args = ap.parse_args()
     p = Params(**{f.name: getattr(args, f.name) for f in fields(Params)})
-    w = WallParams(**{f.name: getattr(args, f.name) for f in fields(WallParams)}) if args.walls else None
+    w = WallParams(**{f.name: getattr(args, f.name) for f in fields(WallParams)}) if args.walls and not args.tub else None
+    t = TubParams(**{f.name: getattr(args, f.name) for f in fields(TubParams)}) if args.tub else None
     board = plates.read_board(PCB)
     n = args.modules
     args.out.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory() as tmp:
         if w is not None:
             walls.check(n, p, w, board, *plates.layout(n, p, board)[:2])
-        a, (W, H, Z) = build(n, p, board, Path(tmp), w)
-        step = args.out / f'assembly_{n}.step'
-        glb = args.out / f'assembly_{n}.glb'
+        if t is not None:
+            W, H, _, back, *_ = plates.layout(n, p, board)
+            tub_mod.check(n, p, t, board, W, H, back)
+        a, (W, H, Z) = build(n, p, board, Path(tmp), w, t)
+        stem = f'assembly_{n}_tub' if t else f'assembly_{n}'
+        step = args.out / f'{stem}.step'
+        glb = args.out / f'{stem}.glb'
         a.export(str(step))
         # Coarser tessellation than the default: a fraction of the size, same look at this scale.
         a.export(str(glb), tolerance=0.05, angularTolerance=0.2)
-    print(f'{n} modules: {W:.0f} x {H:.0f} x {Z:.0f} mm (without feet and switches)')
+    print(f'{n} modules: plates {W:.0f} x {H:.0f} mm, {Z:.1f} mm to the front plate top (without feet and switches)')
     print(f'  wrote {step}\n  wrote {glb}')
-    if args.renders:
+    if args.renders and t is not None:
+        yu, zu, _ = tub_mod.usb_center(n, p, t, board, W, H)
+        # The fine renders first: the mesh is kept on the shapes, and a coarse one isn't redone.
+        render(a, args.out / f'{stem}_usb.png', (70, 12), zoom=1.0, focus=(W, yu - 10, zu), dist=150, fine=True)
+        render(a, args.out / f'{stem}_bottom.png', (-25, -35), zoom=2.0, fine=True)
+        render(a, args.out / f'{stem}_front.png', (-25, 30), zoom=2.0)
+        render(a, args.out / f'{stem}_inside.png', (-25, 30), hide=('front_plate', 'screw_top', 'switch_nut_top',
+                                                                   'switch_washer_top'), zoom=2.0)
+        print(f'  renders: {args.out}/{stem}_{{front,bottom,inside,usb}}.png')
+    elif args.renders:
         render(a, args.out / f'assembly_{n}_front.png', (-25, 30), zoom=2.0)
         render(a, args.out / f'assembly_{n}_inside.png', (-25, 30), hide=('front_plate', 'screw_top', 'switch_nut_top',
                                                                          'switch_washer_top', 'wall_'), zoom=2.0)
