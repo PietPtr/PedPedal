@@ -17,6 +17,8 @@ All boards sit in one enclosure. Everything is through-hole and hand-soldered.
   the KiCad library. The project's `fp-lib-table` registers it as `footswitches`.
 - `mech/plates.py`: generates the laser-cut front and back plate DXFs in `mech/out/`. Run it
   with `uv run` (the repository's `pyproject.toml` holds the Python dependencies).
+- `mech/walls.py`: generates the optional 3D-printed side walls as STLs in `mech/out/`
+  (`uv run --group dev`, needs cadquery).
 - `pcb/scripts/`: the scripts that generated the schematic and the board and ran the
   autorouter. They rebuild the files from scratch, so they overwrite any edits made in KiCad.
 - `firmware/`, `driver/`, `core/`: the Pico firmware, the host driver library with its
@@ -94,6 +96,35 @@ On module 1, the Pico connects to the same nets that the IN connector carries, s
 header (J1) is not fitted there: nothing would plug into it, and leaving it off means no one
 can plug a cable in there by mistake. No jumpers are needed to make a module the "master"
 board: fitting the Pico is all it takes.
+
+### Future option: bridge boards instead of ribbon cables
+
+Not part of the current build. If the ribbon cables and IDC sockets turn out more expensive or
+fiddly than expected, the modules can be joined with small rigid bridge PCBs instead. This
+needs no change to the main board, so it can be decided after the boards are ordered:
+
+- **Main boards:** fit a 2×4 female header (2.54 mm) in J1 and J2 instead of the shrouded box
+  header. The IDC footprint is the standard 2.54 mm grid (1.0 mm drill, 1.7 mm pads), so a
+  plain header fits. Only the silkscreen outline, which is sized for the shroud, looks
+  oversized. Module 1 still leaves J1 empty.
+- **Bridge board:** a 2×4 male pin header at each end, pointing down, 88.0 mm apart centre to
+  centre (one module's OUT to the next module's IN). Both connectors have the same
+  orientation and pinout, so the bridge is 8 straight traces, pin 1 to pin 1, on one layer.
+  The board is about 94 × 12 mm. Keep each end within about 3 mm past its pin columns: on a
+  middle module the incoming and outgoing bridges end 12 mm apart (IN to OUT), which leaves a
+  gap of about 5 mm. One bridge is needed per joint (N − 1).
+- **Clearance:** the bridge covers the strip about 3–17 mm from the board's top edge. On the
+  next module that is the empty Pico area (no Pico on modules 2 and up) and bare board. The
+  top mounting-hole standoffs are 27.2 mm from the top edge, so they are clear. On an 8.5 mm female
+  header plus the male header's 2.5 mm spacer, the bridge underside is about 11 mm above the
+  PCB and its top about 12.6 mm, which is lower than the IDC socket with its clip and well
+  under the front plate (25 mm).
+- **Mechanics:** the bridges fix the module pitch at 100 mm, which the plate holes already
+  set. Plug them in after the boards are on the back plate and before the front plate goes on.
+
+If this is adopted, update `docs/bom.md`, the cable-length and connector-height notes under
+[Enclosure](#enclosure), the connector height in `mech/plates.py` and the cable blocks in
+`mech/assembly.py`.
 
 ## Pico connections (module 1 only)
 
@@ -266,7 +297,8 @@ The board is 80 × 86 mm. Seen from the top (component side, facing the enclosur
 ## Enclosure
 
 The enclosure is a sandwich of two laser-cut 3 mm plates: the **front plate** on top and the
-**back plate** underneath. The sides are open, so the USB port is reachable without a cutout.
+**back plate** underneath. The sides are open, or closed with optional printed walls (see
+[Side walls](#side-walls)).
 There are no separate case spacers: each board's four mounting holes carry a **column** from
 plate to plate. A 25 mm M3 **female-female standoff** runs from the front plate down to the
 PCB. Under the PCB sits a 5 mm **male-female standoff** with its 6 mm stud pointing up
@@ -278,6 +310,7 @@ joints.
 
 ```
  front plate  ══[screw]═════════[nut+washer]════════════(LED)═════   3 mm
+                 M3 × 6
                   ║             [nut+washer]               │ │
                   ║  25 mm F-F   ┌────────┐ ─┬─ 4.4 mm    19 mm
                   ║  standoff    │ switch │  │            spacer
@@ -321,8 +354,12 @@ back plate; on the real boards they are cut short (see *Under the PCB*).
   3 mm or less** after soldering, including the footswitch pins (4.4 mm uncut) and the Pico
   header pins. That leaves at least 2 mm above the back plate. The back plate is acrylic, so
   a lead that touches it can't short anything. The short standoff's stud goes 4.4 mm into the
-  long standoff, and the M3 × 8 top screw 5 mm from the other end. The M3 × 6 bottom screw
-  goes 3 mm into the 5 mm short standoff. The script checks these.
+  long standoff, and the M3 × 6 top screw 3 mm from the other end. The M3 × 6 bottom screw
+  goes 3 mm into the 5 mm short standoff. The script checks these. All 8 screws per module are
+  the same M3 × 6, so one pack covers both plates. An 8 mm screw would also fit at the top, but
+  not at the bottom: it would bottom out in the 5 mm short standoff before clamping the plate.
+  3 mm of thread (6 turns) is enough at the top, because a stomp presses the plate onto the
+  standoffs instead of pulling on the screws.
 - **Feet:** 2 per module under the back plate, one under each switch at the front edge
   (straight under the stomp) and one behind it at the back edge, so the unit can't tip when
   the overhanging back edge is stepped on. The script checks that no foot sits on a screw head.
@@ -374,7 +411,42 @@ back plate; on the real boards they are cut short (see *Under the PCB*).
     of slack, which sags onto the next module's empty Pico area. That is harmless too.
   - **Pico** on module 1: about 15 mm on headers, more in sockets.
 - **USB:** module 1's Pico USB port is at the board's right edge, 5 mm in from the plates'
-  right edge. The sides are open, so the cable plugs straight in between the plates.
+  right edge. Without walls the cable plugs straight in between the plates. With walls it goes
+  through the cutout in the right-hand end cap.
+
+### Side walls
+
+The walls are an optional add-on: the plates, columns and screws are the same with or without
+them, and there are no slots or extra holes in the plates for them. `uv run --group dev
+mech/walls.py 4 8` writes the STLs (`walls_N_end_left.stl`, `walls_N_end_right.stl`,
+`walls_N_straight.stl`), a render of the pieces (`walls_N.png`) and the profile
+(`walls_section.png`). `mech/assembly.py` includes them (`--no-walls` leaves them out).
+
+- **Profile:** a stepped wall. The **core**, 31.4 mm tall, sits between the plates and reaches
+  3 mm in from the plate edges (2 mm short of the boards). The **skin** outside it is 37.6 mm
+  tall, flush with the front plate's top and the back plate's underside, and sticks out 3 mm
+  past the plate edges, so the unit becomes 396 × 102 mm (4 modules). The plate edges sit in
+  the two rebates with 0.2 mm clearance.
+- **Holding:** the rebates hold the walls in and out. The pieces form a closed frame around the
+  plates, so they can't slide along them either. No screws or glue.
+- **Height:** the core is 0.2 mm shorter than the 31.6 mm gap, so the columns set the gap and
+  the plates clamp on them, not on the walls. If the back edge is stepped on, the plate flexes
+  0.1 mm and then rests on the back wall, which supports the 32 mm overhang behind the back
+  row of columns.
+- **Pieces:** the frame is cut in the middle of each 20 mm gap between two boards. That gives
+  two U-shaped end caps (98 × 102 mm) and 2N − 4 straight pieces (100 × 6 mm, all the
+  same): 4 for 4 modules, 12 for 8. The pieces don't depend on N, so the same prints serve any
+  length. One module is cut in half instead. Each joint has two 1.9 mm holes, 6 mm deep each
+  side, for 11 mm pieces of 1.75 mm filament, which line up the faces.
+- **USB cutout:** in the right-hand end cap, 14 mm wide, on the Pico's centre line, from 1 to
+  20 mm above the PCB. That covers the Pico soldered straight onto its headers and in sockets.
+- **Printing:** upright, as installed, without supports. The core overhangs the skin by
+  3.2 mm at the bottom, a short overhang that prints fine. PETG or PLA, about 3 walls.
+- **Assembly:** with the front plate off, stand the pieces round the back plate (its edge in
+  their bottom rebate), joined by the pins, then lower the front plate into the top rebate and
+  screw it down as usual. On a new build this goes between mechanical steps M5 and M6. The
+  build guide has it as its own section at the end (steps W1–W4), for a finished unit. To take
+  the walls off, take the front plate off.
 
 ## Open items
 

@@ -566,12 +566,33 @@ def mechanical():
         md += [s['text'].strip(), '']
         for j in range(len(s['views'])):
             md += [f'![Step M{i}](build/mech/{m.image_name(i, s, j)})', '']
+    md += ['---', '', '## Side walls (optional)', '', WALLS_INTRO, '']
+    for i, s in enumerate(m.WALL_STEPS, 1):
+        md += [f'### Step W{i}: {s["title"]}', '']
+        if s['parts']:
+            md += ['| Part | Qty |', '|------|-----|'] + [f'| {d} | {q} |' for q, d in s['parts']] + ['']
+        md += [s['text'].strip(), '']
+        for j in range(len(s['views'])):
+            md += [f'![Step W{i}](build/mech/{m.image_name(i, s, j, "w")})', '']
     return md
+
+
+WALLS_INTRO = """\
+Printed walls close the open sides. They go on a finished unit, or during the build after
+step M5. The plates don't change: the walls hook over the plate edges, and the plates hold
+them in place once the front plate is screwed down.
+
+**Printing:** run `uv run --group dev mech/walls.py N` for N buttons and print the STLs from
+`mech/out/` upright, as they come, without supports. PETG or PLA, 3 perimeters. The same pieces
+fit any number of buttons: two end caps and 2N − 4 straight pieces. Print one end cap first and
+try it on the back plate's edge: the plate should drop into the step with a little play.
+
+**Tools:** as above, plus a 2 mm drill bit and side cutters for the pins."""
 
 
 MECH_INTRO = """\
 The unit is a sandwich: the boards sit on the back plate, and the front plate sits on the
-standoff columns. The sides stay open. The steps below are for {n} buttons: one main board
+standoff columns. The sides stay open, or get the printed walls in the last section. The steps below are for {n} buttons: one main board
 and {n_ext} extension boards. For more buttons, use the longer plates and more of the same
 hardware per board.
 

@@ -79,7 +79,7 @@ Per module:
 |-----|------|------|-------|--------|
 | 4 | Hex standoff, female-female | M3 × 25 mm | Brass or steel, not nylon: they carry the stomping load | Order · listed |
 | 4 | Hex standoff, male-female, under the PCB | M3 × 5 mm + 6 mm stud | Brass. Stud up through the PCB into the 25 mm standoff. Cut all leads under the PCB to 3 mm or less, the switch pins too | Order · listed |
-| 4 | Screw, front plate to standoff | M3 × 8 mm, button head (ISO 7380) | 3 mm plate + 5 mm into the standoff. For flush heads, countersink the plate by hand and use countersunk M3 × 8 | Order · listed |
+| 4 | Screw, front plate to standoff | M3 × 6 mm, button head (ISO 7380) | 3 mm plate + 3 mm into the 25 mm standoff. Same screw as the back plate, so one pack covers both. For flush heads, countersink the plate by hand and use countersunk M3 × 6 | Order · listed (pick 6 mm) |
 | 4 | Screw, back plate to short standoff | M3 × 6 mm, button head (ISO 7380) | 3 mm plate + 3 mm into the 5 mm short standoff | Order · listed (pick 6 mm) |
 | 1 | LED spacer, for 5 mm LED | 19 mm | Puts the LED tip level with the plate's top surface. 18 mm sits 1 mm lower; 20 mm sticks out 0.6 mm | Order · listed (pick the 19 mm variant) |
 | 2 | Rubber foot, stick-on | 12 mm across, 3+ mm tall | Under the back plate: one under the switch at the front edge, one behind it at the back edge. Tall enough to clear the screw heads (about 1.7 mm) | Order · listed |
@@ -92,8 +92,18 @@ Per enclosure (4 modules / 8 modules):
 | 1 | Front plate, laser cut | 390 × 96 mm / 790 × 96 mm | 3 mm acrylic, from `mech/out/frontplate_N.dxf` | Order |
 | 1 | Back plate, laser cut | same | 3 mm, from `mech/out/backplate_N.dxf`. Only the column holes | Order |
 
+Optional side walls, 3D printed from `mech/walls.py` (see
+[design.md](design.md#side-walls)). The same prints fit any number of modules:
+
+| Qty | Part | Size | Notes | Status |
+|-----|------|------|-------|--------|
+| 1 | Wall end cap, left | 98 × 102 × 37.6 mm | `mech/out/walls_N_end_left.stl`, PETG or PLA | Print |
+| 1 | Wall end cap, right | same | `walls_N_end_right.stl`, with the USB cutout | Print |
+| 2N − 4 | Wall, straight | 100 × 6 × 37.6 mm | `walls_N_straight.stl`: 4 for 4 modules, 12 for 8 | Print |
+| 4N − 4 | Alignment pin | 1.75 mm filament, 11 mm | Two per joint | Have |
+
 The lengths above are for 3 mm plates. For other sizes, run
-`uv run mech/plates.py N --panel-thickness T --pcb-spacer L --bottom-screw S`: it prints the LED spacer, screw
+`uv run mech/plates.py N --panel-thickness T --pcb-spacer L --top-screw S --bottom-screw S`: it prints the LED spacer, screw
 and spacer numbers for that stack and refuses combinations that don't fit.
 
 ## Totals for N modules

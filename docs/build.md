@@ -297,7 +297,7 @@ Same PCB, same steps, but **skip steps 4, 10 and 11**. Leave R5–R8, U3 empty (
 ## Mechanical assembly (4 buttons)
 
 The unit is a sandwich: the boards sit on the back plate, and the front plate sits on the
-standoff columns. The sides stay open. The steps below are for 4 buttons: one main board
+standoff columns. The sides stay open, or get the printed walls in the last section. The steps below are for 4 buttons: one main board
 and 3 extension boards. For more buttons, use the longer plates and more of the same
 hardware per board.
 
@@ -416,10 +416,10 @@ its LED should light.
 
 | Part | Qty |
 |------|-----|
-| M3 × 8 mm button head screw | 16 |
+| M3 × 6 mm button head screw | 16 |
 | M12 nut and washer, from the switch | 4 |
 
-1. Screw an **M3 × 8** screw through the plate into every standoff (16 in all). Snug,
+1. Screw an **M3 × 6** screw through the plate into every standoff (16 in all). Snug,
    not tight: the plate is acrylic.
 2. On each switch: the second washer, then the second nut, on top of the plate. Tighten the
    nut by hand, then a quarter turn with a 14 mm spanner, holding the switch straight.
@@ -445,3 +445,80 @@ Turn it back over and plug USB into the Pico, at the right-hand end.
 ![Step M9](build/mech/09-done-1.webp)
 
 ![Step M9](build/mech/09-done-2.webp)
+
+---
+
+## Side walls (optional)
+
+Printed walls close the open sides. They go on a finished unit, or during the build after
+step M5. The plates don't change: the walls hook over the plate edges, and the plates hold
+them in place once the front plate is screwed down.
+
+**Printing:** run `uv run --group dev mech/walls.py N` for N buttons and print the STLs from
+`mech/out/` upright, as they come, without supports. PETG or PLA, 3 perimeters. The same pieces
+fit any number of buttons: two end caps and 2N − 4 straight pieces. Print one end cap first and
+try it on the back plate's edge: the plate should drop into the step with a little play.
+
+**Tools:** as above, plus a 2 mm drill bit and side cutters for the pins.
+
+### Step W1: Take the front plate off
+
+The walls hook over the edges of both plates, so the front plate has to come off. If you are
+building a new unit, fit the walls after step M5 instead, and skip this step.
+
+1. Take the top nut and washer off each switch (14 mm spanner).
+2. Unscrew the 16 M3 × 6 screws from the front plate.
+3. Lift the front plate off. The boards stay screwed to the back plate.
+
+![Step W1](build/mech/w01-walls-open.webp)
+
+### Step W2: Walls around the back plate
+
+| Part | Qty |
+|------|-----|
+| wall end cap, left (`walls_N_end_left.stl`) | 1 |
+| wall end cap, right, with the USB cutout (`walls_N_end_right.stl`) | 1 |
+| wall, straight (`walls_N_straight.stl`) | 4 |
+| alignment pin: 1.75 mm filament, 11 mm long | 12 |
+
+Each wall has a step along its top and bottom inside edge. The edge of the back plate sits in
+the bottom step, the front plate's edge in the top one.
+
+1. Clean the stringing out of the pin holes at the ends of the pieces. A 2 mm drill, turned by
+   hand, does it.
+2. Cut 12 pins of 11 mm from 1.75 mm filament. Push two into the
+   holes at **both ends of the end caps' arms**, halfway in.
+3. Hook the **right end cap** (the one with the USB cutout) over the right-hand end of the
+   back plate. The plate's edge goes into its bottom step, and the USB port lines up with
+   the cutout. Then the **left end cap** at the left-hand end.
+4. Fit the 4 straight pieces along the front and back edges, from one end to the
+   other. Push each one onto the pins of the piece before it, then put two pins in its free
+   end for the next one.
+5. Check that the frame sits flat on the bench all round, with the back plate's edge in the
+   step everywhere. If a piece won't close up, trim the pin a little.
+
+Until the front plate is on, the straight pieces can fall outwards. A strip of tape across
+each joint holds them.
+
+![Step W2](build/mech/w02-walls-fit.webp)
+
+### Step W3: Front plate back on
+
+1. Lower the front plate onto the standoffs, as in step M6. Its edge drops into the top step
+   of the walls all round. If it catches, find the piece that has moved out of line and push
+   it back in.
+2. Screw it down with the 16 M3 × 6 screws, and put the top washers and nuts back
+   on the switches, as in step M7. Take any tape off.
+
+The plates now hold the walls: there is no need for glue. The walls are slightly shorter than
+the standoffs, so the screws still clamp on the standoffs, not on the walls.
+
+![Step W3](build/mech/w03-walls-close.webp)
+
+### Step W4: Done
+
+USB goes in through the cutout in the right-hand end cap.
+
+![Step W4](build/mech/w04-walls-done-1.webp)
+
+![Step W4](build/mech/w04-walls-done-2.webp)

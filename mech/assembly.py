@@ -1,9 +1,11 @@
 """3D model of the whole unit: front and back plate, the standoff/spacer columns through each
 board, screws, switch nuts, LED spacers, feet, chain cables, and the boards with their components (exported from
-KiCad). Uses the same layout and dimensions as plates.py.
+KiCad), and the printed side walls from walls.py. Uses the same layout and dimensions as
+plates.py.
 
     uv run mech/assembly.py 4     # writes mech/out/assembly_4.step and assembly_4.glb
                                   # plus check renders assembly_4_*.png
+    uv run mech/assembly.py 4 --no-walls    # the open-sided version
 
 Module 1 (rightmost) gets the Pico and R5-R8 but no IN header (J1); the others the other way round.
 The LED is lifted onto its spacer, and chips are put in the DIP sockets, in a temporary copy of
@@ -23,6 +25,8 @@ import cadquery as cq
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import plates  # noqa: E402
 from plates import HEX_R, Params  # noqa: E402
+import walls  # noqa: E402
+from walls import WallParams  # noqa: E402
 
 ROOT = plates.ROOT
 PCB = ROOT / 'pcb' / 'footswitch.kicad_pcb'
@@ -40,6 +44,8 @@ C_BLACK = cq.Color(0.08, 0.08, 0.08)
 C_RUBBER = cq.Color(0.12, 0.12, 0.12)
 C_SPACER = cq.Color(0.92, 0.92, 0.90)       # white nylon LED spacer
 C_RIBBON = cq.Color(0.70, 0.70, 0.72)
+C_WALL = cq.Color(0.30, 0.32, 0.36)         # printed walls (PETG, dark grey)
+C_PIN = cq.Color(0.95, 0.85, 0.20)          # filament pins, yellow so they show
 
 
 class Assy(cq.Assembly):
@@ -161,7 +167,8 @@ def _origin():
 
 # ---------------------------------------------------------------- assembly
 
-def build(n, p, board, workdir):
+def build(n, p, board, workdir, wall_params=None):
+    """The whole unit. With `wall_params`, also the printed walls (named wall_*)."""
     W, H, front, back, boards, feet = plates.layout(n, p, board)
     T = p.panel_thickness
     # z = 0 at the back plate's underside
@@ -190,7 +197,7 @@ def build(n, p, board, workdir):
 
     standoff = hex_spacer(p.standoff)
     spacer = mf_up(p.pcb_spacer, p.stud)
-    screw_top = button_screw(T + 5)
+    screw_top = button_screw(p.top_screw)
     screw_bot = button_screw(p.bottom_screw)
     nut_, washer_ = nut(14, p.switch_nut, 12), washer(18, 12.2, p.switch_washer)
     lsp = led_spacer(led_lift)
@@ -232,12 +239,21 @@ def build(n, p, board, workdir):
             nxt = boards[i + 1][0] + board['parts']['J2'][0]
             pts = [(jx['J1'], top), (nxt, top)]
             a.add(ribbon(pts).translate((0, jy, 0)), name=f'ribbon_{i}', color=C_RIBBON)
+
+    if wall_params is not None:
+        for name, piece in walls.build(n, p, wall_params, board):
+            a.add(piece, name=f'wall_{name}', color=C_WALL)
+        pin = (cq.Workplane('YZ').circle(1.75 / 2).extrude(2 * wall_params.pin_depth - 1)
+               .translate((-(2 * wall_params.pin_depth - 1) / 2, 0, 0)))
+        for k, (x, y, z, side) in enumerate(walls.pins(n, p, wall_params, board, H)):
+            a.add(pin, name=f'wall_pin_{side}_{k}', color=C_PIN, loc=cq.Location((x, y, z)))
     return a, (W, H, z_front + T)
 
 
 # ---------------------------------------------------------------- check renders (VTK, off screen)
 
-def render(a, png, view, size=(1600, 900), hide=(), zoom=1.3):
+def render(a, png, view, size=(1600, 900), hide=(), zoom=1.3, focus=None, dist=None):
+    """`focus` (x, y, z) and `dist` aim the camera at a point instead of the whole unit."""
     import vtk
     from cadquery.occ_impl.assembly import toVTKAssy
 
@@ -255,14 +271,18 @@ def render(a, png, view, size=(1600, 900), hide=(), zoom=1.3):
     win.SetSize(*size)
     cam = ren.GetActiveCamera()
     ren.ResetCamera()
-    fx, fy, fz = cam.GetFocalPoint()
-    dist = cam.GetDistance()
+    fx, fy, fz = focus or cam.GetFocalPoint()
+    dist = dist or cam.GetDistance()
     az, el = view
     cam.SetPosition(fx + dist * math.cos(math.radians(el)) * math.sin(math.radians(az)),
                     fy - dist * math.cos(math.radians(el)) * math.cos(math.radians(az)),
                     fz + dist * math.sin(math.radians(el)))
+    cam.SetFocalPoint(fx, fy, fz)
     cam.SetViewUp(0, 0, 1)
-    ren.ResetCamera()
+    if focus is None:
+        ren.ResetCamera()
+    else:
+        ren.ResetCameraClippingRange()
     cam.Zoom(zoom)
     win.Render()
     img = vtk.vtkWindowToImageFilter()
@@ -279,15 +299,20 @@ def main():
     ap.add_argument('modules', type=int, nargs='?', default=4)
     ap.add_argument('--out', default=ROOT / 'mech' / 'out', type=Path)
     ap.add_argument('--no-renders', dest='renders', action='store_false')
-    for f in fields(Params):
-        ap.add_argument(f'--{f.name.replace("_", "-")}', type=float, default=f.default)
+    ap.add_argument('--no-walls', dest='walls', action='store_false', help='leave out the printed side walls')
+    for cls in (Params, WallParams):
+        for f in fields(cls):
+            ap.add_argument(f'--{f.name.replace("_", "-")}', type=float, default=f.default)
     args = ap.parse_args()
     p = Params(**{f.name: getattr(args, f.name) for f in fields(Params)})
+    w = WallParams(**{f.name: getattr(args, f.name) for f in fields(WallParams)}) if args.walls else None
     board = plates.read_board(PCB)
     n = args.modules
     args.out.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory() as tmp:
-        a, (W, H, Z) = build(n, p, board, Path(tmp))
+        if w is not None:
+            walls.check(n, p, w, board, *plates.layout(n, p, board)[:2])
+        a, (W, H, Z) = build(n, p, board, Path(tmp), w)
         step = args.out / f'assembly_{n}.step'
         glb = args.out / f'assembly_{n}.glb'
         a.export(str(step))
@@ -298,9 +323,14 @@ def main():
     if args.renders:
         render(a, args.out / f'assembly_{n}_front.png', (-25, 30), zoom=2.0)
         render(a, args.out / f'assembly_{n}_inside.png', (-25, 30), hide=('front_plate', 'screw_top', 'switch_nut_top',
-                                                                         'switch_washer_top'), zoom=2.0)
-        render(a, args.out / f'assembly_{n}_side.png', (-90, 0), zoom=3.2)
-        print(f'  renders: {args.out}/assembly_{n}_{{front,inside,side}}.png')
+                                                                         'switch_washer_top', 'wall_'), zoom=2.0)
+        render(a, args.out / f'assembly_{n}_side.png', (-90, 0), hide=('wall_',), zoom=3.2)
+        names = 'front,inside,side'
+        if w is not None:              # the right-hand end, to check the USB cutout against the Pico
+            render(a, args.out / f'assembly_{n}_usb.png', (70, 15), zoom=1.0,
+                   focus=(W, walls.usb_y(p, board, H) - 15, Z / 2), dist=160)
+            names += ',usb'
+        print(f'  renders: {args.out}/assembly_{n}_{{{names}}}.png')
 
 
 if __name__ == '__main__':

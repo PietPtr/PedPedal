@@ -66,6 +66,7 @@ class Params:
     standoff: float = 25.0        # F-F standoff, PCB top to front plate underside
     pcb_spacer: float = 5.0       # M-F standoff body, back plate top to PCB underside
     stud: float = 6.0             # its male thread, up through the PCB into the long standoff
+    top_screw: float = 6.0        # through the front plate into the long standoff's top end
     bottom_screw: float = 6.0     # through the back plate into the short standoff's female end
     pcb_thickness: float = 1.6
     switch_body: float = 20.6     # PCB to the switch's shoulder (where the thread starts)
@@ -195,10 +196,12 @@ def check(n, p, board, W, H, front, back, boards, feet):
                       'use a longer PCB spacer or cut the leads shorter')
     # The stud from below and the top screw from above must not meet inside the long standoff.
     stud_in = p.stud - p.pcb_thickness
-    top_in = 5.0
+    top_in = p.top_screw - p.panel_thickness
     if stud_in + top_in > p.standoff - 1:
         errors.append(f'stud ({stud_in:.1f} mm) and top screw ({top_in:.1f} mm) meet inside the '
                       f'{p.standoff} mm standoff')
+    if top_in < 1.5:
+        errors.append(f'top screw goes only {top_in:.1f} mm into the long standoff: use a longer one')
     # The short standoff's female hole is at most as deep as its body.
     screw_in = p.bottom_screw - p.panel_thickness
     if screw_in > p.pcb_spacer - 0.5:
@@ -231,13 +234,13 @@ def check(n, p, board, W, H, front, back, boards, feet):
         f'switch: lower nut sits {gap:.1f} mm under the front plate; thread used {thread_used:.1f} of {p.switch_thread} mm',
         f'under the PCB: {p.pcb_spacer:.1f} mm to the back plate; cut all leads to {p.lead_stub:g} mm '
         f'(switch and Pico pins too), leaving {p.pcb_spacer - p.lead_stub:.1f} mm',
-        f'stud {stud_in:.1f} mm into the long standoff, top screw {top_in:g} mm; '
+        f'stud {stud_in:.1f} mm into the long standoff, top screw {top_in:g} mm in; '
         f'bottom screw {screw_in:.1f} mm into the short one',
         f'chain connector + cable: at most {p.connector_height:.1f} mm, '
         f'{p.standoff - p.connector_height:.1f} mm under the front plate',
         f'chain cable: {span:.0f} mm between sockets, {p.cable_length:.0f} mm cable; {cable}',
         f'LED spacer: {led_spacer:.1f} mm puts the LED tip {p.led_proud:+.1f} mm from the front plate top',
-        f'screws: M3 x {p.panel_thickness + 5:.0f} mm through the front plate into each standoff, '
+        f'screws: M3 x {p.top_screw:g} mm through the front plate into each standoff, '
         f'M3 x {p.bottom_screw:g} mm up through the back plate into each short standoff',
         f'feet: {len(feet)} stick-on rubber feet, {p.foot_diameter:g} mm, under the back plate',
     ]

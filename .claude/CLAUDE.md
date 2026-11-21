@@ -60,11 +60,14 @@ pdftoppm -png -r 220 -x X -y Y -W W -H H -singlefile sch.pdf crop   # zoom on a 
 - `mech/plates.py`: the laser-cut front and back plates. It writes DXFs to `mech/out/` and reads
   part positions from the board. It also writes check renders (`_preview.png`, `_dxf.png`)
   there; look at them after every change.
+- `mech/walls.py`: the optional 3D-printed side walls (STLs in `mech/out/`), a stepped frame
+  that hooks over both plate edges. Needs cadquery (`uv run --group dev`). Check `walls_N.png`
+  and `walls_section.png`, and `assembly_N_usb.png` for the USB cutout.
 - `mech/assembly.py`: 3D model of the whole unit (STEP + GLB), with the boards exported from
   KiCad. Needs cadquery (in the uv `dev` group). It renders PNGs off screen with VTK for
   checking.
-- `mech/assembly_steps.py`: the mechanical assembly steps (4 buttons) at the end of
-  `docs/build.md`. It holds the step texts, which `build_docs.py` reads, and renders their pictures
+- `mech/assembly_steps.py`: the mechanical assembly steps (4 buttons) and the optional side-wall
+  steps at the end of `docs/build.md`. It holds the step texts, which `build_docs.py` reads, and renders their pictures
   into `docs/build/mech/` (`uv run --group dev mech/assembly_steps.py`, about 1 min).
 
 - `pcb/`: the KiCad project (`footswitch.kicad_pro`, `.kicad_sch`, later `.kicad_pcb`).
