@@ -1,8 +1,9 @@
 # Firmware and driver
 
-All in Rust. The Pico on module 1 shows up on the computer as a USB MIDI device called
-**Footswitch**. It sends MIDI when the pedals are pressed. The same MIDI port takes
-configuration from the driver, so the computer needs no extra driver.
+The firmware is in Rust. The Pico on module 1 shows up on the computer as a USB MIDI device
+called **Footswitch**. It sends MIDI when the pedals are pressed. The same MIDI port takes
+configuration as SysEx, so the computer needs no extra driver. There are config libraries in
+Rust, Python and JavaScript, the `fsctl` command-line tool, and a config page in the browser.
 
 ## Layout
 
@@ -11,6 +12,9 @@ configuration from the driver, so the computer needs no extra driver.
 | `core/`     | `footswitch-core`     | Shared by both sides, `no_std`: the config types, the SysEx protocol, USB-MIDI packets and the pedal state machine (debounce, momentary/latch, LEDs). Has the unit tests. |
 | `firmware/` | `footswitch-firmware` | The Pico firmware. Started from [rp2040-project-template](https://github.com/rp-rs/rp2040-project-template). |
 | `driver/`   | `footswitch`          | Host library to configure the device, plus the `fsctl` command-line tool. |
+| `driver-py/` | `footswitch` (Python) | Port of the `driver/` library to Python, on python-rtmidi. |
+| `driver-js/` | `footswitch` (JS)     | Port of the `driver/` library to JavaScript, on Web MIDI. Used by the config page. |
+| `site/config/` | –                   | The config page in the browser. `footswitch.js` there is a symlink to `driver-js/`. |
 
 The repository root is a Cargo workspace with `core` and `driver`. The firmware builds for
 another target (`thumbv6m-none-eabi`), so it is left out of the workspace and built from its
@@ -77,6 +81,19 @@ works. Update it with `cargo install elf2uf2-rs --force`.
 With a debug probe, switch the runner to the `probe-rs` line instead. You then also get the
 defmt log output.
 
+## Config page
+
+`site/config/` on the product site: connect, then set each pedal's mode, colour and MIDI
+message, and save. It shows the pedals' LEDs live. It needs Web MIDI with SysEx: Chrome, Edge
+or Firefox (not Safari), served over https:// or from localhost. To run it locally:
+
+```sh
+cd site && python3 -m http.server     # then open http://localhost:8000/config/
+```
+
+`site/config/footswitch.js` is a symlink to `driver-js/footswitch.js`. If the web host doesn't
+follow symlinks, copy the file in when deploying.
+
 ## fsctl
 
 Pedals are numbered from 1 (the module with the Pico), and MIDI channels 1–16.
@@ -119,6 +136,35 @@ fs.save()?;
 There are also `pedal`, `pedals`, `set_pedal`, `update_pedal`, `set_all_colors`, `settings`,
 `set_settings`, `states`, `reset_defaults` and `enter_bootloader`. See `driver/src/lib.rs`.
 
+The Python and JavaScript libraries are straight ports with the same functions. Change the
+protocol in `core/` and you have to change them too; their tests check against byte vectors
+from the Rust encoder.
+
+Python (`driver-py/`, needs python-rtmidi; tests: `cd driver-py && uv run --group dev pytest`):
+
+```python
+from footswitch import Color, Footswitch, Mode, Note
+
+with Footswitch.open() as fs:
+    fs.set_mode(0, Mode.LATCH)
+    fs.set_color(0, Color.GREEN)
+    fs.set_message(0, Note(channel=9, note=36, velocity=100))
+    fs.save()
+```
+
+JavaScript (`driver-js/footswitch.js`, an ES module for the browser; tests:
+`cd driver-js && node --test`):
+
+```js
+import { Color, Footswitch, Mode } from "./footswitch.js";
+
+const fs = await Footswitch.open();   // asks for MIDI SysEx permission
+await fs.setMode(0, Mode.Latch);
+await fs.setColor(0, Color.Green);
+await fs.setMessage(0, { kind: "note", channel: 9, note: 36, velocity: 100 });
+await fs.save();
+```
+
 ## Protocol
 
 SysEx on the same USB MIDI port, with manufacturer ID `7D` (non-commercial) and device ID
@@ -142,7 +188,8 @@ tell devices apart by name. The product string is "Footswitch" and the manufactu
 - `cargo test` runs the unit tests in `core`: config and flash format, protocol, USB-MIDI
   packets, and the pedal logic (debounce, momentary, latch, inversion, unplugging).
 - The driver and fsctl were tested over real ALSA MIDI against a simulated device: a virtual
-  MIDI port that answers the protocol using the `core` crate.
+  MIDI port that answers the protocol using the `core` crate. The Python library and the config
+  page (in headless Chromium, over Web MIDI) were tested against the same simulator.
 - **Not yet tested on hardware:** the PIO scan, flash saving, USB enumeration and the
   bootloader reboot. Things to check at bring-up:
   - `fsctl show` lists the right number of modules.

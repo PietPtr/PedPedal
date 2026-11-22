@@ -11,8 +11,8 @@ Pico, which is the USB MIDI device. All parts are through-hole. Firmware and hos
 - [docs/build.md](docs/build.md) ([PDF](docs/build.pdf)): build instructions
 - [docs/design.md](docs/design.md): board and enclosure design
 - [docs/bom.md](docs/bom.md): parts list
-- [docs/firmware.md](docs/firmware.md): firmware, driver and the `fsctl` tool
-- `pcb/`: KiCad project. `mech/`: plates, walls and 3D assembly. `firmware/`, `driver/`, `core/`: Rust code.
+- [docs/firmware.md](docs/firmware.md): firmware, config libraries (Rust, Python, JS), the `fsctl` tool and the browser config page
+- `pcb/`: KiCad project. `mech/`: plates, walls and 3D assembly. `firmware/`, `driver/`, `core/`: Rust code. `driver-py/`, `driver-js/`: Python and JS config libraries. `site/`: product page and config page.
 
 --- 
 

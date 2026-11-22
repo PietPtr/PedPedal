@@ -1,0 +1,15 @@
+[project]
+name = "footswitch"
+version = "0.1.0"
+description = "Configure the PedPedal USB MIDI footswitch: each pedal's MIDI message, momentary/latch mode and LED colour."
+readme = "README.md"
+license = "MIT OR Apache-2.0"
+requires-python = ">=3.9"
+dependencies = ["python-rtmidi>=1.5"]
+
+[dependency-groups]
+dev = ["pytest>=8"]
+
+[build-system]
+requires = ["uv_build>=0.8,<0.14"]
+build-backend = "uv_build"

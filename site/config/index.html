@@ -1,0 +1,155 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>Configure PedPedal</title>
+    <meta
+      name="description"
+      content="Configure your PedPedal footswitch in the browser over Web MIDI: each pedal's MIDI message, momentary or latching mode, and LED colour."
+    />
+    <meta name="theme-color" content="#050507" />
+    <link rel="preload" href="../fonts/unbounded-800.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="stylesheet" href="../style.css" />
+    <link rel="stylesheet" href="config.css" />
+  </head>
+  <body class="cfg-page">
+    <header class="bar">
+      <a class="brand" href="../">PedPedal</a>
+      <nav>
+        <a href="https://github.com/PietPtr/PedPedal/blob/main/docs/build.md">Build</a>
+        <a href="./" aria-current="page">Configure</a>
+        <a href="https://github.com/PietPtr/PedPedal">GitHub</a>
+      </nav>
+    </header>
+
+    <main class="cfg">
+      <section class="intro">
+        <h1>Configure</h1>
+        <p>
+          Set each pedal's MIDI message, mode and LED colour from the browser. Changes apply
+          straight away. Save them to keep them after unplugging.
+        </p>
+      </section>
+
+      <!-- Shown until a footswitch is connected. -->
+      <section id="connect" class="panel connect">
+        <span class="beacon" aria-hidden="true"></span>
+        <div class="connect-text">
+          <h2 id="connect-title">Plug in your footswitch</h2>
+          <p id="connect-msg">Connect it over USB, then press Connect.</p>
+        </div>
+        <button id="connect-btn" class="btn primary" type="button">Connect</button>
+        <p class="hint">
+          Works in Chrome, Edge and Firefox (not Safari). The browser asks to allow control of
+          MIDI devices; that permission is needed to send settings to the pedal.
+        </p>
+      </section>
+
+      <!-- Shown while connected. -->
+      <section id="device" hidden>
+        <div class="panel device-bar">
+          <dl class="facts-list">
+            <div><dt>Port</dt><dd id="d-port">–</dd></div>
+            <div><dt>Firmware</dt><dd id="d-fw">–</dd></div>
+            <div><dt>Pedals</dt><dd id="d-count">–</dd></div>
+          </dl>
+          <div class="save-box">
+            <span id="dirty" class="dirty" hidden>Not saved yet</span>
+            <span id="saved" class="saved" hidden>Saved on the pedal</span>
+            <button id="save-btn" class="btn primary" type="button">Save to pedal</button>
+          </div>
+        </div>
+
+        <p id="no-modules" class="note" hidden>
+          No pedal modules detected. Showing pedal 1's settings; check the cables between
+          modules.
+        </p>
+
+        <div id="pedals" class="pedals"></div>
+
+        <details class="panel advanced">
+          <summary>Device settings</summary>
+          <div class="adv-grid">
+            <label class="switch-row">
+              <input id="invert" type="checkbox" />
+              <span class="switch" aria-hidden="true"></span>
+              <span>
+                <b>Invert switches</b>
+                <small>For switches whose contacts are swapped, so a pedal reads as pressed
+                  while it is up.</small>
+              </span>
+            </label>
+            <div class="adv-action">
+              <span>
+                <b>Factory defaults</b>
+                <small>Every pedal momentary and red, sending CC 102 and up on channel 1. Save
+                  afterwards to keep them.</small>
+              </span>
+              <button id="reset-btn" class="btn" type="button">Reset</button>
+            </div>
+            <div class="adv-action">
+              <span>
+                <b>Firmware update</b>
+                <small>Reboots the Pico into its bootloader. Copy the new .uf2 file onto the
+                  RPI-RP2 drive that appears.</small>
+              </span>
+              <button id="boot-btn" class="btn" type="button">Enter bootloader</button>
+            </div>
+          </div>
+        </details>
+      </section>
+
+      <p class="foot">
+        Prefer code? The same settings are available from the
+        <a href="https://github.com/PietPtr/PedPedal/blob/main/docs/firmware.md">Rust, Python and JavaScript libraries</a>
+        and the <code>fsctl</code> command-line tool.
+      </p>
+    </main>
+
+    <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+
+    <template id="pedal-tpl">
+      <article class="panel pedal">
+        <header class="pedal-head">
+          <h3>Pedal <span class="p-num"></span></h3>
+          <span class="led" title="LED"></span>
+        </header>
+
+        <fieldset class="seg">
+          <legend>Mode</legend>
+          <label><input type="radio" value="0" /><span>Momentary</span></label>
+          <label><input type="radio" value="1" /><span>Latch</span></label>
+        </fieldset>
+
+        <fieldset class="colors">
+          <legend>LED colour</legend>
+          <div class="swatch-row"></div>
+        </fieldset>
+
+        <fieldset class="midi">
+          <legend>MIDI message</legend>
+          <div class="midi-row">
+            <label class="field grow">
+              <span>Type</span>
+              <select class="m-kind">
+                <option value="cc">Control change</option>
+                <option value="note">Note</option>
+                <option value="pc">Program change</option>
+                <option value="none">Nothing</option>
+              </select>
+            </label>
+            <label class="field ch">
+              <span>Channel</span>
+              <select class="m-ch"></select>
+            </label>
+          </div>
+          <div class="midi-row m-fields"></div>
+          <p class="m-desc"></p>
+        </fieldset>
+      </article>
+    </template>
+
+    <script type="module" src="config.js"></script>
+  </body>
+</html>

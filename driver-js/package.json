@@ -1,0 +1,13 @@
+{
+  "name": "footswitch",
+  "version": "0.1.0",
+  "description": "Configure the PedPedal USB MIDI footswitch over Web MIDI: each pedal's MIDI message, momentary/latch mode and LED colour.",
+  "type": "module",
+  "main": "footswitch.js",
+  "exports": "./footswitch.js",
+  "files": ["footswitch.js"],
+  "scripts": {
+    "test": "node --test"
+  },
+  "license": "MIT OR Apache-2.0"
+}

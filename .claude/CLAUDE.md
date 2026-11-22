@@ -80,6 +80,11 @@ pdftoppm -png -r 220 -x X -y Y -W W -H H -singlefile sch.pdf crop   # zoom on a 
   draft stills (look at `site/anim/build/SHOT/draft/stills/sheet.png`), `-q final` for the videos in
   `site/media/`. This machine has only an Intel iGPU: iterate with draft stills, and only
   render whole loops at preview/final once the look is agreed. See `site/anim/README.md`.
+- `driver/` (Rust), `driver-py/` (Python, python-rtmidi) and `driver-js/` (JS, Web MIDI): the
+  host config libraries. The Python and JS ones are straight ports of the Rust one; when the
+  protocol in `core/` changes, update both. Their tests use byte vectors from the Rust encoder.
+- `site/config/`: the Web MIDI config page. `site/config/footswitch.js` is a symlink to
+  `driver-js/footswitch.js`.
 - `pcb/`: the KiCad project (`footswitch.kicad_pro`, `.kicad_sch`, later `.kicad_pcb`).
 - `pcb-jlc/`: the SMD version of the board, assembled by JLCPCB (`footswitch_jlc.*`). Its
   scripts are `scripts/run.sh WORKDIR` (route + DRC, like `pcb/scripts/run.sh`) and
