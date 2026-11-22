@@ -17,9 +17,16 @@ _autosave-*
 # LibreOffice lock files
 .~lock.*#
 
+# Blender auto-saved previous versions
+*.blend1
+
 # Generated output (rebuild with the scripts)
 mech/out/
-docs/build.pdf
 pcb/gerbers/
 pcb/gerbers.zip
 pcb-jlc/fab/
+
+# Render-farm downloads (zipped frames); encode with
+# site/anim/render.py --encode-only --from renders/SHOT-*.zip.
+# The encoded clips in site/media/ are kept in git.
+renders/

@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>PedPedal: open hardware MIDI footswitches</title>
+<meta name="description" content="A modular USB MIDI footswitch controller. Momentary or latching, an RGB LED per switch, chain as many as you need. Open hardware, through-hole, firmware in Rust.">
+<meta name="theme-color" content="#050507">
+<link rel="preload" href="fonts/unbounded-800.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header class="bar">
+  <a class="brand" href="#top">PedPedal</a>
+  <nav>
+    <a href="https://github.com/PietPtr/PedPedal/blob/main/docs/build.md">Build</a>
+    <a href="https://github.com/PietPtr/PedPedal">GitHub</a>
+  </nav>
+</header>
+
+<!-- The clips are rendered at 21:9. object-fit: cover crops them to whatever the screen is:
+     the sides go on narrow screens, the product stays in the middle.
+     media/SHOT-21x9.webm only exists for final renders; the mp4 is the fallback. -->
+<div class="stage" aria-hidden="true">
+  <video data-shot="pedals" muted loop playsinline preload="auto" poster="media/pedals-21x9.jpg">
+    <source src="media/pedals-21x9.webm" type="video/webm">
+    <source src="media/pedals-21x9.mp4" type="video/mp4">
+  </video>
+  <video data-shot="exploded" muted loop playsinline preload="none" poster="media/exploded-21x9.jpg">
+    <source src="media/exploded-21x9.webm" type="video/webm">
+    <source src="media/exploded-21x9.mp4" type="video/mp4">
+  </video>
+  <video data-shot="expandable" muted loop playsinline preload="none" poster="media/expandable-21x9.jpg">
+    <source src="media/expandable-21x9.webm" type="video/webm">
+    <source src="media/expandable-21x9.mp4" type="video/mp4">
+  </video>
+  <video data-shot="colors" muted loop playsinline preload="none" poster="media/colors-21x9.jpg">
+    <source src="media/colors-21x9.webm" type="video/webm">
+    <source src="media/colors-21x9.mp4" type="video/mp4">
+  </video>
+  <div class="scrim"></div>
+</div>
+
+<ol class="dots" aria-label="Sections">
+  <li><a href="#pedals"><span>Your MIDI pedals</span></a></li>
+  <li><a href="#open"><span>Open Hardware</span></a></li>
+  <li><a href="#expandable"><span>Expandable</span></a></li>
+  <li><a href="#custom"><span>Customizable</span></a></li>
+</ol>
+
+<main id="top">
+
+  <section class="chapter" id="pedals" data-shot="pedals">
+    <div class="pin">
+      <div class="head">
+        <h1>Your MIDI pedals</h1>
+      </div>
+      <div class="body">
+        <p>Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation.</p>
+        <ul class="facts">
+          <li><b>Momentary</b> or <b>latching</b>, per switch</li>
+          <li><b>7 LED colours</b>, per switch</li>
+        </ul>
+      </div>
+      <a class="scroll-hint" href="#open" aria-label="Next section"></a>
+    </div>
+  </section>
+
+  <section class="chapter" id="open" data-shot="exploded">
+    <div class="pin">
+      <div class="head">
+        <h2>Open Hardware</h2>
+      </div>
+      <div class="body">
+        <p>Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa.</p>
+        <ul class="facts">
+          <li><b>KiCad</b> boards</li>
+          <li><b>Rust</b> firmware on a Raspberry Pi Pico</li>
+          <li><b>Through-hole</b> or factory-assembled</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section class="chapter" id="expandable" data-shot="expandable">
+    <div class="pin">
+      <div class="head">
+        <h2>Expandable</h2>
+      </div>
+      <div class="body">
+        <p>Curabitur pretium tincidunt lacus. Nulla gravida orci a odio, et tempus feugiat. Nullam varius, turpis et commodo pharetra, est eros bibendum elit, nec luctus magna felis.</p>
+        <ul class="facts">
+          <li><b>Any count</b>: the plates are generated to fit</li>
+          <li><b>Hot-pluggable</b> modules</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section class="chapter" id="custom" data-shot="colors">
+    <div class="pin">
+      <div class="head">
+        <h2>Customizable</h2>
+      </div>
+      <div class="body">
+        <p>Integer in mauris eu nibh euismod gravida. Duis ac tellus et risus vulputate vehicula. Donec lobortis risus a elit. Etiam tempor ut ullamcorper.</p>
+        <ul class="swatches" aria-label="Plate finishes">
+          <li style="--c: rgba(220, 235, 255, .25)">Clear</li>
+          <li style="--c: #0b0b0e">Shiny black</li>
+          <li style="--c: #e9e6e1">Matte white</li>
+          <li style="--c: #ff2e93">Bright pink</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <footer class="end">
+    <h2>Build one</h2>
+    <p>Praesent dapibus, neque id cursus faucibus, tortor neque egestas augue, eu vulputate magna eros eu erat.</p>
+    <div class="ctas">
+      <a class="btn primary" href="https://github.com/PietPtr/PedPedal/blob/main/docs/build.md">Build guide</a>
+      <a class="btn" href="https://github.com/PietPtr/PedPedal/blob/main/docs/bom.md">Parts list</a>
+      <a class="btn" href="https://github.com/PietPtr/PedPedal">Source on GitHub</a>
+    </div>
+  </footer>
+
+</main>
+
+<script src="main.js"></script>
+</body>
+</html>

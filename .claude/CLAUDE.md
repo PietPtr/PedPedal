@@ -75,6 +75,11 @@ pdftoppm -png -r 220 -x X -y Y -W W -H H -singlefile sch.pdf crop   # zoom on a 
   into `docs/build/mech/`, plus `cover.webp`, the exploded view at the top of build.md and in the
   README (`--cover` renders only that one) (`uv run --group dev mech/assembly_steps.py`, about 1 min).
 
+- `site/`: the product web page. `site/anim/` is the pipeline for its pre-rendered looping 3D
+  clips (Blender 5.3 EEVEE, `~/bin/blender`): `uv run site/anim/render.py SHOT --stills 6` for
+  draft stills (look at `site/anim/build/SHOT/draft/stills/sheet.png`), `-q final` for the videos in
+  `site/media/`. This machine has only an Intel iGPU: iterate with draft stills, and only
+  render whole loops at preview/final once the look is agreed. See `site/anim/README.md`.
 - `pcb/`: the KiCad project (`footswitch.kicad_pro`, `.kicad_sch`, later `.kicad_pcb`).
 - `pcb-jlc/`: the SMD version of the board, assembled by JLCPCB (`footswitch_jlc.*`). Its
   scripts are `scripts/run.sh WORKDIR` (route + DRC, like `pcb/scripts/run.sh`) and
