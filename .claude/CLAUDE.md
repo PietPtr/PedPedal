@@ -85,6 +85,9 @@ pdftoppm -png -r 220 -x X -y Y -W W -H H -singlefile sch.pdf crop   # zoom on a 
   protocol in `core/` changes, update both. Their tests use byte vectors from the Rust encoder.
 - `site/config/`: the Web MIDI config page. `site/config/footswitch.js` is a symlink to
   `driver-js/footswitch.js`.
+  It also flashes the Pico over WebUSB (`picoboot.js`, tests: `node --test site/config/`)
+  with the firmware in `site/config/firmware/`, written by `firmware/release.sh`. Rerun that
+  script after firmware changes so the site ships the new build.
 - `pcb/`: the KiCad project (`footswitch.kicad_pro`, `.kicad_sch`, later `.kicad_pcb`).
 - `pcb-jlc/`: the SMD version of the board, assembled by JLCPCB (`footswitch_jlc.*`). Its
   scripts are `scripts/run.sh WORKDIR` (route + DRC, like `pcb/scripts/run.sh`) and

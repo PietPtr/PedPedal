@@ -46,7 +46,6 @@ h2, h3 { font-family: var(--display); font-weight: 600; letter-spacing: 0; text-
 }
 .connect h2 { font-size: 19px; margin: 0 0 4px; }
 .connect p { margin: 0; color: var(--muted); }
-.connect .hint { grid-column: 1 / -1; font-size: 14px; border-top: 1px solid var(--line); padding-top: 16px; }
 .connect.error .beacon { background: var(--danger); box-shadow: 0 0 0 6px rgba(255, 107, 122, .15); animation: none; }
 
 .beacon {
@@ -74,6 +73,75 @@ button.btn {
 }
 button.btn.primary { color: #0a0a10; background: var(--accent); }
 button.btn:disabled { opacity: .45; cursor: default; filter: none; }
+
+/* ---- firmware flashing ---- */
+
+.flash {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 16px 20px;
+  padding: 20px 24px;
+  margin-top: 16px;
+}
+.flash h2 { font-size: 17px; margin: 0 0 4px; }
+.flash p { margin: 0; color: var(--muted); }
+.flash .beacon { display: none; }
+.flash-actions { display: flex; flex-wrap: wrap; gap: 10px; justify-content: flex-end; }
+a.btn { color: var(--fg); white-space: nowrap; }
+.flash .hint { grid-column: 1 / -1; font-size: 14px; border-top: 1px solid var(--line); padding-top: 14px; }
+.flash .hint:empty, .flash p:empty { display: none; }
+.flash h2:only-child { margin: 0; }
+.flash .hint a { color: var(--fg); }
+/* A Pico in bootloader mode was found: the panel takes the lead. */
+.flash.found { grid-template-columns: auto 1fr auto; border-color: rgba(111, 141, 255, .5); }
+.flash.found .beacon { display: block; }
+.flash.found .progress, .flash.found .hint { grid-column: 1 / -1; }
+.flash.error { border-color: rgba(255, 107, 122, .5); }
+.flash.done { border-color: rgba(95, 227, 161, .5); }
+
+.modal {
+  width: min(480px, calc(100vw - 32px));
+  padding: 24px;
+  color: var(--fg);
+  background: #15151c;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+}
+.modal::backdrop { background: rgba(0, 0, 0, .6); backdrop-filter: blur(4px); }
+.modal h2 { font-size: 19px; margin: 0 0 14px; }
+.modal ol { margin: 0 0 14px; padding-left: 20px; display: grid; gap: 8px; }
+.modal .muted { color: var(--muted); font-size: 14px; margin: 0 0 10px; }
+.modal form { display: flex; justify-content: flex-end; margin-top: 18px; }
+
+.progress {
+  grid-column: 1 / -1;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--field);
+  overflow: hidden;
+}
+.progress span {
+  display: block;
+  height: 100%;
+  width: calc(var(--p, 0) * 100%);
+  background: var(--accent);
+  transition: width .15s;
+}
+
+.update-pill {
+  margin-left: 10px;
+  padding: 2px 10px;
+  border-radius: 999px;
+  border: 0;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  color: #0a0a10;
+  background: var(--accent);
+  cursor: pointer;
+  vertical-align: 1px;
+}
 
 /* ---- device bar ---- */
 
@@ -204,7 +272,8 @@ legend {
 .field select option { background: #15151b; }
 .field input:focus, .field select:focus { outline: 2px solid var(--blue); outline-offset: 0; border-color: transparent; }
 .field input[aria-invalid="true"] { border-color: var(--danger); outline-color: var(--danger); }
-.m-desc { margin: 0; font-size: 14px; color: var(--muted); min-height: 1.4em; }
+.m-desc { margin: 0; font-size: 14px; color: var(--danger); }
+.m-desc:empty { display: none; }
 
 /* ---- device settings ---- */
 
@@ -279,6 +348,10 @@ legend {
   .cfg { padding-left: 16px; padding-right: 16px; }
   .connect { grid-template-columns: auto 1fr; }
   .connect .btn { grid-column: 1 / -1; justify-self: stretch; text-align: center; }
+  .flash, .flash.found { grid-template-columns: auto 1fr; }
+  .flash:not(.found) .flash-text { grid-column: 1 / -1; }
+  .flash-actions { grid-column: 1 / -1; justify-content: stretch; }
+  .flash-actions .btn { flex: 1 1 auto; text-align: center; }
   .save-box { width: 100%; justify-content: space-between; }
   .adv-action { flex-direction: column; align-items: flex-start; }
 }

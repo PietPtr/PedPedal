@@ -66,6 +66,37 @@ cd firmware && cargo build --release
 
 ## Flashing
 
+### From the config page
+
+The config page ships with the latest firmware (`site/config/firmware/`) and flashes it over
+WebUSB, which needs Chrome or Edge:
+
+1. Hold BOOTSEL on the Pico while plugging in USB, or press **Update firmware** under Device
+   settings while the footswitch is connected.
+2. The page notices the Pico in bootloader mode and asks to flash the firmware. The first
+   time, the browser has to be pointed at it once: press **Find Pico** and choose "RP2 Boot".
+3. It writes, reads back to check, and restarts the Pico, which then reconnects as the
+   footswitch.
+
+Only the sectors the firmware covers are erased, so saved settings in the last sector stay.
+The device bar shows "x.y.z available" when the pedal runs older firmware than the page ships.
+The code is `site/config/picoboot.js` (the bootrom's PICOBOOT protocol, as picotool uses);
+its tests run against a simulated bootrom: `node --test site/config/`.
+
+- **Linux:** the browser needs access to the USB device, through a udev rule such as
+  `/etc/udev/rules.d/60-pico.rules` with
+  `SUBSYSTEM=="usb", ATTRS{idVendor}=="2e8a", ATTRS{idProduct}=="0003", TAG+="uaccess"`
+  (picotool's packages install one).
+- **Windows:** the RP2040 bootrom's PICOBOOT interface has no driver by default (it can be
+  given WinUSB with Zadig). Without that, the page offers the .uf2 file to copy by hand.
+- **Firefox and Safari** have no WebUSB; the page offers the .uf2 download instead.
+
+**Releasing:** bump `version` in `firmware/Cargo.toml`, then run `firmware/release.sh`. It
+builds the release firmware and writes `site/config/firmware/footswitch.uf2` and
+`firmware.json` (version, size, commit). Commit both with the site.
+
+### From the command line
+
 The runner in `firmware/.cargo/config.toml` is `elf2uf2-rs -d`. It writes to the Pico's
 RPI-RP2 USB drive.
 
@@ -84,7 +115,7 @@ defmt log output.
 ## Config page
 
 `site/config/` on the product site: connect, then set each pedal's mode, colour and MIDI
-message, and save. It shows the pedals' LEDs live. It needs Web MIDI with SysEx: Chrome, Edge
+message, and save. It also flashes firmware (see [Flashing](#from-the-config-page)). It shows the pedals' LEDs live. It needs Web MIDI with SysEx: Chrome, Edge
 or Firefox (not Safari), served over https:// or from localhost. To run it locally:
 
 ```sh

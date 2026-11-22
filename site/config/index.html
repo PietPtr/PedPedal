@@ -6,7 +6,7 @@
     <title>Configure PedPedal</title>
     <meta
       name="description"
-      content="Configure your PedPedal footswitch in the browser over Web MIDI: each pedal's MIDI message, momentary or latching mode, and LED colour."
+      content="Configure your PedPedal footswitch in the browser over Web MIDI: each pedal's MIDI message, momentary or latching mode, and LED colour. Update its firmware from the same page."
     />
     <meta name="theme-color" content="#050507" />
     <link rel="preload" href="../fonts/unbounded-800.woff2" as="font" type="font/woff2" crossorigin />
@@ -26,10 +26,6 @@
     <main class="cfg">
       <section class="intro">
         <h1>Configure</h1>
-        <p>
-          Set each pedal's MIDI message, mode and LED colour from the browser. Changes apply
-          straight away. Save them to keep them after unplugging.
-        </p>
       </section>
 
       <!-- Shown until a footswitch is connected. -->
@@ -40,18 +36,50 @@
           <p id="connect-msg">Connect it over USB, then press Connect.</p>
         </div>
         <button id="connect-btn" class="btn primary" type="button">Connect</button>
-        <p class="hint">
-          Works in Chrome, Edge and Firefox (not Safari). The browser asks to allow control of
-          MIDI devices; that permission is needed to send settings to the pedal.
-        </p>
       </section>
+
+      <!-- Firmware update over WebUSB, shown while no footswitch is connected. A Pico started
+           with BOOTSEL held is spotted here and offered the firmware shipped with this page. -->
+      <section id="flash" class="panel flash" hidden>
+        <span class="beacon" aria-hidden="true"></span>
+        <div class="flash-text">
+          <h2 id="flash-title">Update the firmware</h2>
+          <p id="flash-msg"></p>
+        </div>
+        <div class="flash-actions">
+          <button id="flash-btn" class="btn primary" type="button" hidden>Flash</button>
+          <button id="flash-find" class="btn" type="button" hidden>Find Pico</button>
+          <button id="flash-cancel" class="btn" type="button" hidden>Cancel</button>
+          <a id="flash-dl" class="btn" download hidden>Download firmware</a>
+          <button id="flash-help" class="btn" type="button" hidden>Help</button>
+        </div>
+        <div id="flash-progress" class="progress" hidden><span></span></div>
+        <p id="flash-hint" class="hint"></p>
+      </section>
+
+      <dialog id="flash-help-dlg" class="modal" aria-labelledby="flash-help-title">
+        <h2 id="flash-help-title">Updating the firmware</h2>
+        <ol>
+          <li>Hold the BOOTSEL button on the Pico while plugging it in.</li>
+          <li id="help-usb">Press <b>Find Pico</b> and pick the RP2 Boot device. After the first
+            time, this page spots the Pico by itself.</li>
+          <li id="help-usb2">Press <b>Flash firmware</b>. Saved pedal settings are kept.</li>
+        </ol>
+        <p id="help-nousb" class="muted">Flashing from the page needs Chrome or Edge.</p>
+        <p class="muted">Or press <b>Download firmware</b> and copy the <code>.uf2</code> file
+          onto the RPI-RP2 drive that appears when the Pico starts with BOOTSEL held.</p>
+        <form method="dialog"><button class="btn primary">Close</button></form>
+      </dialog>
 
       <!-- Shown while connected. -->
       <section id="device" hidden>
         <div class="panel device-bar">
           <dl class="facts-list">
             <div><dt>Port</dt><dd id="d-port">–</dd></div>
-            <div><dt>Firmware</dt><dd id="d-fw">–</dd></div>
+            <div>
+              <dt>Firmware</dt>
+              <dd><span id="d-fw">–</span><button id="fw-update" class="update-pill" type="button" hidden></button></dd>
+            </div>
             <div><dt>Pedals</dt><dd id="d-count">–</dd></div>
           </dl>
           <div class="save-box">
@@ -91,10 +119,10 @@
             <div class="adv-action">
               <span>
                 <b>Firmware update</b>
-                <small>Reboots the Pico into its bootloader. Copy the new .uf2 file onto the
-                  RPI-RP2 drive that appears.</small>
+                <small id="boot-text">Restarts the Pico in its bootloader, then this page flashes the
+                  latest firmware onto it. Saved settings are kept.</small>
               </span>
-              <button id="boot-btn" class="btn" type="button">Enter bootloader</button>
+              <button id="boot-btn" class="btn" type="button">Update firmware</button>
             </div>
           </div>
         </details>
@@ -102,8 +130,12 @@
 
       <p class="foot">
         Prefer code? The same settings are available from the
-        <a href="https://github.com/PietPtr/PedPedal/blob/main/docs/firmware.md">Rust, Python and JavaScript libraries</a>
-        and the <code>fsctl</code> command-line tool.
+        <a href="https://github.com/PietPtr/PedPedal/tree/main/driver">Rust</a>,
+        <a href="https://github.com/PietPtr/PedPedal/tree/main/driver-py">Python</a> and
+        <a href="https://github.com/PietPtr/PedPedal/tree/main/driver-js">JavaScript</a>
+        libraries and the
+        <a href="https://github.com/PietPtr/PedPedal/blob/main/docs/firmware.md#fsctl"><code>fsctl</code></a>
+        command-line tool.
       </p>
     </main>
 
